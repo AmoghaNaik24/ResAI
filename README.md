@@ -50,14 +50,10 @@ Deterministic knowledge retrieval module indexing scientific reporting standards
 ## 🔬 In-Depth Feature Breakdown
 
 ### 1. Ingestion & Grounded Dataset Q&A Tool
-- **Multi-Format Ingestion**: Supports `.csv`, `.xlsx`, and `.xls` files.
+- **Multi-Format Ingestion**: Supports `.csv`, `.xlsx`, and `.xls` laboratory datasets.
 - **Natural Language Dataset Q&A Engine**: Ask ad-hoc questions grounded in the uploaded dataset (distributions, group contrasts, descriptive statistics, outlier audits). Returns zero-hallucination factual responses, and strictly triggers *"Knowledge is limited regarding this inquiry based on the active dataset and methodology library"* if questions fall outside the dataset scope.
 - **Dynamic Research Objective Synthesis**: Automatically derives publication-grade research objectives and manuscript titles tailored specifically to the uploaded file's variables and distributions.
 - **⚡ 1-Click Automatic Report Generation**: Instantly runs data hygiene checks, executes inferential hypothesis tests, and drafts a fully grounded academic manuscript.
-- **Pre-Configured Real-World Lab Scenarios**:
-  - 💊 **Clinical Drug Trial (Phase II)**: Randomized controlled trial tracking Recovery Days, Biomarker Levels, Treatment Arms, and Adverse Events.
-  - 🎓 **Academic Performance Predictors**: Longitudinal study examining Study Hours, Attendance, Tutoring, and Exam Scores.
-  - 🧪 **Catalytic Materials Experiment**: Chemical engineering benchmark monitoring Reaction Temperature, Pressure, Catalyst Types, and Yield Percentage.
 
 ### 2. Automated Data Quality Assessment & Profiling
 - **Data Health Score (0-100%)**: Quantitative index penalizing missing cells, duplicate records, zero-variance columns, and extreme skewness.

@@ -22,9 +22,6 @@ document.addEventListener("DOMContentLoaded", () => {
   initQAListeners();
   initMethodologyListeners();
   initValidationListeners();
-  
-  // Auto load default clinical trial dataset for immediate demo experience
-  loadSampleDataset("clinical");
 });
 
 // Tab Switching
@@ -38,7 +35,22 @@ function initTabs() {
   });
 }
 
+function requireActiveDataset(actionName = "") {
+  if (!state.currentDataset) {
+    showNotification("Dataset not uploaded. Please upload a dataset in Tab 1 first.", "warning");
+    switchTab("upload");
+    return false;
+  }
+  return true;
+}
+
 function switchTab(tabId) {
+  // Guard: if user attempts to navigate to data-dependent tabs without an uploaded dataset
+  if (tabId !== "upload" && tabId !== "rag" && !state.currentDataset) {
+    showNotification("Dataset not uploaded. Please upload a dataset in Tab 1 first.", "warning");
+    tabId = "upload";
+  }
+
   state.activeTab = tabId;
   document.querySelectorAll(".nav-tab-btn").forEach(b => {
     b.classList.toggle("active", b.getAttribute("data-tab") === tabId);
@@ -47,15 +59,18 @@ function switchTab(tabId) {
     pane.classList.toggle("active", pane.id === `tab-${tabId}`);
   });
 
-  // Dynamic refresh based on tab
-  if (tabId === "analysis") {
-    populateTestSelectors();
-    loadRecommendations();
-    loadSummaryStats();
-  } else if (tabId === "visuals") {
-    populateVisualControls();
-    loadHeatmap();
-  } else if (tabId === "rag") {
+  // Dynamic refresh based on tab when dataset is loaded
+  if (state.currentDataset) {
+    if (tabId === "analysis") {
+      populateTestSelectors();
+      loadRecommendations();
+      loadSummaryStats();
+    } else if (tabId === "visuals") {
+      populateVisualControls();
+      loadHeatmap();
+    }
+  }
+  if (tabId === "rag") {
     loadRAGDocuments();
   }
 }

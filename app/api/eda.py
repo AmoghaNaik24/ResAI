@@ -19,7 +19,7 @@ import numpy as np
 ACTIVE_DATASET = {
     "df": None,
     "filename": None,
-    "objective": "Evaluate treatment effectiveness across clinical groups"
+    "objective": ""
 }
 
 

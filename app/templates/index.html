@@ -35,7 +35,7 @@
     <div style="display: flex; align-items: center; gap: 1rem;">
       <div class="header-status-pill">
         <span class="status-dot"></span>
-        <span>Active Dataset: <strong id="header-dataset-name" style="color: var(--secondary);">Clinical_Drug_Trial_Phase_II.csv</strong></span>
+        <span>Active Dataset: <strong id="header-dataset-name" style="color: var(--secondary);">No dataset loaded (Upload file below)</strong></span>
       </div>
       <button class="btn btn-primary" id="btn-run-full-pipeline" title="Run end-to-end data analysis and generate draft report grounded in active dataset">
         ⚡ Generate Automatic Report
@@ -94,23 +94,6 @@
 
           <!-- File Uploaded Confirmation Status Banner -->
           <div id="upload-status-area" style="display: none; margin-top: 1rem;"></div>
-
-          <div style="margin-top: 1.5rem;">
-            <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">
-              Or select a pre-configured laboratory scenario:
-            </div>
-            <div class="btn-group">
-              <button class="btn btn-secondary btn-sm" data-sample="clinical" id="btn-sample-clinical">
-                💊 Clinical Drug Trial (Phase II)
-              </button>
-              <button class="btn btn-secondary btn-sm" data-sample="education" id="btn-sample-edu">
-                🎓 Academic Performance Predictors
-              </button>
-              <button class="btn btn-secondary btn-sm" data-sample="materials" id="btn-sample-sensor">
-                🧪 Catalytic Materials Experiment
-              </button>
-            </div>
-          </div>
         </div>
 
         <!-- Natural Language Dataset Q&A Tool Card -->
@@ -148,10 +131,10 @@
             <div style="font-size: 0.78rem; color: #64748b; margin-bottom: 0.4rem; font-weight: 600;">Suggested inquiries for active dataset (click to ask):</div>
             <div id="qa-suggested-pills" style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.75rem;">
               <button class="btn btn-secondary btn-sm pill-btn" data-q="Summarize this dataset and list key attributes">📊 Dataset Summary</button>
-              <button class="btn btn-secondary btn-sm pill-btn" data-q="What is the average of RecoveryDays?">Mean RecoveryDays</button>
-              <button class="btn btn-secondary btn-sm pill-btn" data-q="What is the average recovery days by TreatmentGroup?">Recovery by Treatment</button>
-              <button class="btn btn-secondary btn-sm pill-btn" data-q="Are there missing values or outliers in this dataset?">Missing & Outliers</button>
-              <button class="btn btn-secondary btn-sm pill-btn" data-q="What does APA 7th require for reporting statistical results?">APA Reporting Standard</button>
+              <button class="btn btn-secondary btn-sm pill-btn" data-q="What is the primary research objective of this study?">🎯 Research Objective</button>
+              <button class="btn btn-secondary btn-sm pill-btn" data-q="Are there missing values or outliers in this dataset?">🔍 Missing & Outliers</button>
+              <button class="btn btn-secondary btn-sm pill-btn" data-q="What statistical tests are recommended for this dataset?">⚡ Recommended Tests</button>
+              <button class="btn btn-secondary btn-sm pill-btn" data-q="What does APA 7th require for reporting statistical results?">📐 APA 7th Standard</button>
             </div>
 
             <!-- Q&A Response Box -->
@@ -172,7 +155,7 @@
               </label>
               <button class="btn btn-secondary btn-sm" id="btn-update-obj" style="padding: 2px 8px; font-size: 0.75rem;">💾 Save Objective</button>
             </div>
-            <textarea id="input-objective" class="form-textarea" rows="2" style="font-size: 0.85rem;" placeholder="e.g., Evaluate recovery days and biomarker reduction across treatment arms.">Evaluate recovery days and biomarker reduction across treatment arms (Placebo vs Drug A vs Drug B).</textarea>
+            <textarea id="input-objective" class="form-textarea" rows="2" style="font-size: 0.85rem;" placeholder="Automatically synthesized upon dataset upload, or enter your custom research inquiry..."></textarea>
           </div>
         </div>
       </div>
