@@ -79,6 +79,7 @@ async def generate_draft_report(req: GenerateReportRequest):
 
     objective = ACTIVE_DATASET.get("objective", "Quantitative Research Evaluation")
     eda_summary = EDAProfiler.profile_dataset(df)
+    eda_summary["filename"] = ACTIVE_DATASET.get("filename") or "Uploaded Research Dataset"
 
     # If user provided specific tests, use them; otherwise automatically compute recommended tests
     computed_tests = []

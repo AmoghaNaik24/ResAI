@@ -21,8 +21,8 @@ Automate the data quality profiling, rigorous mathematical calculations, and man
 
 ## 📸 Platform Walkthrough & Screenshots
 
-### 1. Ingestion & Natural Language Research Objectives (Tab 1)
-Upload arbitrary laboratory datasets (`.csv`, `.xlsx`, `.xls`) or load pre-configured real-world scenarios. Formulate hypotheses and research inquiries in plain language.
+### 1. Ingestion & Natural Language Dataset Q&A (Tab 1)
+Upload arbitrary laboratory datasets (`.csv`, `.xlsx`, `.xls`) or load pre-configured real-world scenarios. Interactively ask questions directly grounded in the active dataset (e.g., summary statistics, group comparisons, outliers, or distributions) with strict limited-knowledge guardrails for off-domain queries. Includes 1-click **⚡ Generate Automatic Report** buttons.
 ![1. Ingest & Research Objectives](docs/screenshots/01_ingest_and_objectives.png)
 
 ### 2. Data Health & Automated Profiling (Tab 2)
@@ -49,9 +49,11 @@ Deterministic knowledge retrieval module indexing scientific reporting standards
 
 ## 🔬 In-Depth Feature Breakdown
 
-### 1. Ingestion & Research Formulation
+### 1. Ingestion & Grounded Dataset Q&A Tool
 - **Multi-Format Ingestion**: Supports `.csv`, `.xlsx`, and `.xls` files.
-- **Natural Language Research Objective**: Formulate primary inquiries (e.g., *"Assess biomarker reduction and recovery days across Placebo vs Drug A vs Drug B treatment arms"*).
+- **Natural Language Dataset Q&A Engine**: Ask ad-hoc questions grounded in the uploaded dataset (distributions, group contrasts, descriptive statistics, outlier audits). Returns zero-hallucination factual responses, and strictly triggers *"Knowledge is limited regarding this inquiry based on the active dataset and methodology library"* if questions fall outside the dataset scope.
+- **Dynamic Research Objective Synthesis**: Automatically derives publication-grade research objectives and manuscript titles tailored specifically to the uploaded file's variables and distributions.
+- **⚡ 1-Click Automatic Report Generation**: Instantly runs data hygiene checks, executes inferential hypothesis tests, and drafts a fully grounded academic manuscript.
 - **Pre-Configured Real-World Lab Scenarios**:
   - 💊 **Clinical Drug Trial (Phase II)**: Randomized controlled trial tracking Recovery Days, Biomarker Levels, Treatment Arms, and Adverse Events.
   - 🎓 **Academic Performance Predictors**: Longitudinal study examining Study Hours, Attendance, Tutoring, and Exam Scores.
