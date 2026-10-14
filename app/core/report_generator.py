@@ -606,6 +606,60 @@ class ReportGenerator:
         return rendered
 
     @staticmethod
+    def build_template_from_outline(outline_text: str) -> str:
+        """
+        Converts a user-provided custom section outline into a structured markdown template.
+        Supports both full templates with {{...}} placeholders and plain section title lists.
+        """
+        if not outline_text or not outline_text.strip():
+            return DEFAULT_TEMPLATES[0]["content"]
+
+        clean_outline = outline_text.strip()
+        if "{{" in clean_outline and "}}" in clean_outline:
+            if not clean_outline.startswith("#"):
+                clean_outline = "# {{title}}\n**Author:** {{researcher_name}} | **Date:** {{date}} | **Dataset:** `{{dataset_name}}`\n\n---\n\n" + clean_outline
+            return clean_outline
+
+        # User specified raw section outline headings
+        lines = [l.strip() for l in clean_outline.split("\n") if l.strip()]
+        tpl_parts = [
+            "# {{title}}",
+            "**Principal Investigator:** {{researcher_name}} | **Date:** {{date}} | **Dataset:** `{{dataset_name}}` (N = {{row_count}})",
+            "\n---"
+        ]
+
+        for line in lines:
+            heading = line
+            if not heading.startswith("#"):
+                heading = f"## {heading}"
+
+            lower_h = line.lower()
+            tpl_parts.append(f"\n{heading}")
+
+            if any(k in lower_h for k in ["abstract", "executive", "summary"]):
+                tpl_parts.append("{{abstract}}")
+            elif any(k in lower_h for k in ["intro", "objective", "inquir", "problem", "background"]):
+                tpl_parts.append("{{introduction}}\n\n**Primary Research Objective:** {{research_objective}}")
+            elif any(k in lower_h for k in ["method", "hygiene", "profiling", "data", "quality", "clean", "cohort"]):
+                tpl_parts.append("{{methodology}}\n\n### Descriptive Statistics Table\n{{descriptive_statistics_table}}\n\n### Categorical Distribution\n{{categorical_distribution_table}}")
+            elif any(k in lower_h for k in ["stat", "hypothes", "result", "finding", "inferen", "test", "model"]):
+                tpl_parts.append("{{hypothesis_testing_results}}\n\n{{detailed_findings}}")
+            elif any(k in lower_h for k in ["discuss", "interpret", "implication", "significance"]):
+                tpl_parts.append("{{discussion}}")
+            elif any(k in lower_h for k in ["limit", "threat", "validity"]):
+                tpl_parts.append("{{limitations}}")
+            elif any(k in lower_h for k in ["conclus", "recommend", "next step", "future"]):
+                tpl_parts.append("{{conclusions}}")
+            elif any(k in lower_h for k in ["figure", "chart", "visual", "plot"]):
+                tpl_parts.append("{{attached_figures}}")
+            elif any(k in lower_h for k in ["ground", "rag", "compliance", "apa", "standard"]):
+                tpl_parts.append("{{document_grounding}}")
+            else:
+                tpl_parts.append("{{discussion}}")
+
+        return "\n".join(tpl_parts)
+
+    @staticmethod
     def construct_academic_report(
         title: str,
         research_objective: str,
@@ -637,11 +691,14 @@ class ReportGenerator:
             professor_template=professor_template
         )
 
-        # If user passed custom template content, render it; otherwise find matching template or use default
-        template_to_use = custom_template_content
-        is_custom = bool(custom_template_content and custom_template_content.strip())
+        # If user passed custom template content/outline, render it for only this report instance
+        template_to_use = None
+        is_custom = False
 
-        if not template_to_use:
+        if custom_template_content and custom_template_content.strip():
+            template_to_use = ReportGenerator.build_template_from_outline(custom_template_content.strip())
+            is_custom = True
+        else:
             # Check if professor_template matches any saved or default template
             all_tpls = ReportGenerator.get_templates()
             matched = next((t for t in all_tpls if t.get("name") == professor_template or t.get("id") == professor_template), None)
@@ -675,6 +732,7 @@ class ReportGenerator:
             "validation_status": "DRAFT_PENDING_REVIEW",
             "human_notes": human_notes,
             "is_custom_template": is_custom,
+            "custom_template_outline": custom_template_content if is_custom else None,
             "rendered_content": rendered_markdown,
             "abstract": context["abstract"],
             "introduction": context["introduction"],

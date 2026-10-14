@@ -242,6 +242,13 @@ async def export_markdown():
         raise HTTPException(status_code=400, detail="No active draft report to export.")
 
     r = CURRENT_REPORT["data"]
+    if r.get("is_custom_template") and r.get("rendered_content"):
+        return Response(
+            content=r.get("rendered_content"),
+            media_type="text/markdown",
+            headers={"Content-Disposition": f"attachment; filename=Report_{r.get('report_id')}.md"}
+        )
+
     md = f"""# {r.get('title')}
 **Author:** {r.get('researcher_name')} | **Date:** {r.get('date')} | **Status:** {r.get('validation_status')}
 

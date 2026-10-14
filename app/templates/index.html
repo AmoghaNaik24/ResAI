@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ResAI | Precision Research Data Analysis & Reporting Platform</title>
-  <meta name="description" content="ResAI - Precision laboratory research platform for automated data quality assessment, rigorous statistical hypothesis testing, publication visualizations, and peer-reviewed draft manuscript reporting with human-in-the-loop validation.">
+  <title>ResAI | analysis made easy</title>
+  <meta name="description" content="ResAI - Precision research data analysis and reporting platform. Automated data quality profiling, rigorous hypothesis testing, and academic manuscripts made easy.">
   
   <!-- Modern Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,13 +22,17 @@
   <!-- Top Navigation & Branding Header -->
   <header class="app-header">
     <div class="brand-wrapper">
-      <div class="brand-logo" id="logo-icon">Ψ</div>
+      <div class="brand-logo" id="logo-icon" style="background: linear-gradient(135deg, #2563eb, #7c3aed); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #ffffff;">
+          <path d="M3 3v18h18" />
+          <path d="M18 9l-5 5-4-4-3 3" />
+        </svg>
+      </div>
       <div>
         <div style="display: flex; align-items: center;">
           <span class="brand-title">ResAI <span style="font-weight: 400; color: #2563eb;">Platform</span></span>
-          <span class="brand-badge">Lab AI Ready</span>
         </div>
-        <div style="font-size: 0.78rem; color: var(--text-muted);">Precision Research Data Analysis, Hypothesis Testing & Reporting</div>
+        <div style="font-size: 0.82rem; color: var(--text-muted); font-weight: 500; letter-spacing: 0.01em;">analysis made easy</div>
       </div>
     </div>
 
@@ -537,7 +541,7 @@
           </div>
           <div class="grid-2" style="margin-bottom: 0.75rem;">
             <div class="form-group">
-              <label class="form-label">Institutional / Professor Template</label>
+              <label class="form-label">Base Style Preset</label>
               <select class="form-select" id="manual-rep-template">
                 <option value="Standard Empirical Research Report">Standard Empirical Research Report</option>
                 <option value="Clinical Trial Phase II Protocol">Clinical Trial Phase II Protocol</option>
@@ -550,6 +554,44 @@
               <input type="text" class="form-input" id="manual-rep-notes" placeholder="Optional notes, citations, or qualitative conditions">
             </div>
           </div>
+
+          <!-- Custom Template Outline Builder -->
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; gap: 0.5rem;">
+              <label class="form-label" style="margin-bottom: 0; font-weight: 700; color: #1e3a8a;">
+                📋 Custom Template Outline (Reflected for This Report Only)
+              </label>
+              <div style="display: flex; gap: 0.4rem; font-size: 0.75rem;">
+                <span style="color: #64748b; align-self: center;">Quick Outlines:</span>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-outline-preset-std" style="padding: 2px 8px; font-size: 0.75rem;">Academic Standard</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-outline-preset-exec" style="padding: 2px 8px; font-size: 0.75rem;">Executive Brief</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-outline-preset-clinical" style="padding: 2px 8px; font-size: 0.75rem;">Clinical Cohort</button>
+              </div>
+            </div>
+            <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem;">
+              Customize the section headings and structure below. You can provide section titles (e.g., <em>1. Executive Summary</em>, <em>2. Data Profiling</em>, <em>3. Statistical Findings</em>) or markdown templates with placeholders (<code>{{abstract}}</code>, <code>{{descriptive_statistics_table}}</code>, <code>{{hypothesis_testing_results}}</code>, <code>{{discussion}}</code>, <code>{{conclusions}}</code>). This outline applies only to this compilation.
+            </div>
+            <textarea class="form-textarea" id="manual-rep-outline" rows="8" style="font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.5;" placeholder="# {{title}}
+## Abstract
+{{abstract}}
+
+## 1. Introduction & Research Problem
+{{introduction}}
+
+## 2. Experimental Data Hygiene & Summary Statistics
+{{methodology}}
+{{descriptive_statistics_table}}
+
+## 3. Empirical Hypothesis Testing & APA Results
+{{hypothesis_testing_results}}
+
+## 4. Analytical Discussion
+{{discussion}}
+
+## 5. Strategic Conclusions & Recommendations
+{{conclusions}}"></textarea>
+          </div>
+
           <button class="btn btn-primary" id="btn-generate-report-manual">
             🛠️ Compile Custom Manual Report
           </button>
@@ -582,44 +624,52 @@
 
       <!-- Academic Manuscript Paper Preview -->
       <article class="academic-manuscript" id="manuscript-paper">
-        <h1 id="rep-title">AI-Assisted Research Data Analysis & Reporting Manuscript</h1>
+        <h1 id="rep-title">No Academic Report Generated Yet</h1>
         <div class="manuscript-meta" id="rep-meta">
-          Author: Lead Lab Researcher | Date: Today | Status: Draft
+          Upload a dataset in Tab 1 and click '⚡ Generate Automatic Report' to synthesize your publication-grade manuscript.
         </div>
 
-        <div style="text-align: center; margin-bottom: 1.5rem;">
-          <span class="badge badge-success" id="rep-status-badge">VERIFIED BY RESEARCHER</span>
+        <div style="text-align: center; margin-bottom: 1.5rem;" id="rep-status-badge-container">
+          <span class="badge badge-success" id="rep-status-badge">DRAFT PENDING REVIEW</span>
         </div>
 
-        <h2>Abstract</h2>
-        <textarea id="rep-abstract-text" class="form-textarea" style="width: 100%; font-family: 'Times New Roman', serif; font-size: 1.05rem; line-height: 1.8;"></textarea>
+        <!-- Standard Predefined Template View -->
+        <div id="manuscript-standard-view">
+          <h2>Abstract</h2>
+          <textarea id="rep-abstract-text" class="form-textarea" style="width: 100%; font-family: 'Times New Roman', serif; font-size: 1.05rem; line-height: 1.8;"></textarea>
 
-        <h2>1. Introduction & Research Inquiries</h2>
-        <p id="rep-intro"></p>
+          <h2>1. Introduction & Research Inquiries</h2>
+          <p id="rep-intro"></p>
 
-        <h2>2. Data Quality & Preprocessing Methodology</h2>
-        <p id="rep-methodology"></p>
+          <h2>2. Data Quality & Preprocessing Methodology</h2>
+          <p id="rep-methodology"></p>
 
-        <h2>3. Statistical Analysis & Hypothesis Testing</h2>
-        <div id="rep-results-container"></div>
+          <h2>3. Statistical Analysis & Hypothesis Testing</h2>
+          <div id="rep-results-container"></div>
 
-        <h2>4. Discussion & Scientific Interpretation</h2>
-        <textarea id="rep-discussion-text" class="form-textarea" style="width: 100%; font-family: 'Times New Roman', serif; font-size: 1.05rem; line-height: 1.8;"></textarea>
+          <h2>4. Discussion & Scientific Interpretation</h2>
+          <textarea id="rep-discussion-text" class="form-textarea" style="width: 100%; font-family: 'Times New Roman', serif; font-size: 1.05rem; line-height: 1.8;"></textarea>
 
-        <h2>5. Limitations & Threats to Validity</h2>
-        <p id="rep-limitations" style="white-space: pre-line;"></p>
+          <h2>5. Limitations & Threats to Validity</h2>
+          <p id="rep-limitations" style="white-space: pre-line;"></p>
 
-        <h2>6. Conclusion & Recommendations</h2>
-        <textarea id="rep-conclusions-text" class="form-textarea" style="width: 100%; font-family: 'Times New Roman', serif; font-size: 1.05rem; line-height: 1.8;"></textarea>
+          <h2>6. Conclusion & Recommendations</h2>
+          <textarea id="rep-conclusions-text" class="form-textarea" style="width: 100%; font-family: 'Times New Roman', serif; font-size: 1.05rem; line-height: 1.8;"></textarea>
 
-        <h2>7. Document Grounding & Methodology Compliance (RAG Library)</h2>
-        <div id="rep-doc-grounding" style="white-space: pre-line; background: #f8fafc; border-left: 3px solid #2563eb; padding: 0.85rem 1.1rem; margin-bottom: 1.5rem; font-family: 'Times New Roman', serif; font-size: 1rem; line-height: 1.6; border-radius: 0 6px 6px 0;"></div>
+          <h2>7. Document Grounding & Methodology Compliance (RAG Library)</h2>
+          <div id="rep-doc-grounding" style="white-space: pre-line; background: #f8fafc; border-left: 3px solid #2563eb; padding: 0.85rem 1.1rem; margin-bottom: 1.5rem; font-family: 'Times New Roman', serif; font-size: 1rem; line-height: 1.6; border-radius: 0 6px 6px 0;"></div>
+        </div>
 
-        <h2>8. Researcher Review Notes & Sign-Off</h2>
+        <!-- Custom Outline Rendered View (Active for Custom Manual Builder Reports Only) -->
+        <div id="manuscript-custom-outline-view" style="display: none; padding-top: 0.5rem;">
+          <div id="rep-custom-rendered-content" style="font-family: 'Times New Roman', serif; font-size: 1.05rem; line-height: 1.8; color: #1e293b;"></div>
+        </div>
+
+        <h2>Researcher Review Notes & Sign-Off</h2>
         <div class="no-print" style="margin-bottom: 0.5rem; font-size: 0.85rem; color: #64748b;">
           Enter any peer remarks, professor feedback, or specific experimental caveats:
         </div>
-        <textarea id="human-notes-input" class="form-textarea" placeholder="e.g., Verified against experimental notebook #4. Significance confirmed for Drug B recovery reduction at p < .001."></textarea>
+        <textarea id="human-notes-input" class="form-textarea" placeholder="e.g., Verified against experimental notebook. Significance confirmed at p < .001."></textarea>
       </article>
     </section>
 

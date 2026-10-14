@@ -45,10 +45,17 @@ function requireActiveDataset(actionName = "") {
 }
 
 function switchTab(tabId) {
-  // Guard: if user attempts to navigate to data-dependent tabs without an uploaded dataset
-  if (tabId !== "upload" && tabId !== "rag" && !state.currentDataset) {
+  // Guard: if user attempts to navigate to any tab without an uploaded dataset
+  if (tabId !== "upload" && !state.currentDataset) {
     showNotification("Dataset not uploaded. Please upload a dataset in Tab 1 first.", "warning");
     tabId = "upload";
+    document.querySelectorAll(".nav-tab-btn").forEach(b => {
+      b.classList.toggle("active", b.getAttribute("data-tab") === "upload");
+    });
+    document.querySelectorAll(".tab-pane").forEach(pane => {
+      pane.classList.toggle("active", pane.id === "tab-upload");
+    });
+    return;
   }
 
   state.activeTab = tabId;
@@ -282,6 +289,7 @@ function renderSamplePreviewTable(records) {
 
 // 1-Click Data Cleaning
 document.getElementById("btn-clean-data").addEventListener("click", async () => {
+  if (!requireActiveDataset("clean dataset")) return;
   showNotification("Executing automated dataset cleaning and imputation...", "info");
   const formData = new FormData();
   formData.append("drop_duplicates", "true");
@@ -438,6 +446,7 @@ document.getElementById("btn-calc-reg").addEventListener("click", () => {
 });
 
 async function executeSpecificTest(testType, params) {
+  if (!requireActiveDataset("run statistical tests")) return;
   showNotification(`Computing rigorous mathematical test via Python...`, "info");
   let url = "";
   let body = params || {};
@@ -681,6 +690,7 @@ if (btnLine) {
 let chartStreamCounter = 0;
 
 async function renderPlotlyChart(apiUrl, containerId, chartLabel) {
+  if (!requireActiveDataset("render scientific visualizations")) return;
   try {
     showNotification("Rendering publication-grade visualization...", "info");
     const res = await fetch(apiUrl);
@@ -769,6 +779,7 @@ async function renderPlotlyChart(apiUrl, containerId, chartLabel) {
 
 // 1-Click Automated Pipeline
 async function runFullAutomatedPipeline() {
+  if (!requireActiveDataset("generate an automatic report")) return;
   showNotification("Executing End-to-End Automated Research Pipeline...", "info");
   try {
     // 1. Ensure cleaned
@@ -804,35 +815,124 @@ function renderAcademicManuscript(rep) {
   document.getElementById("rep-meta").textContent = `Author: ${rep.researcher_name} | Date: ${rep.date} | Status: ${rep.validation_status}`;
   document.getElementById("rep-status-badge").textContent = rep.validation_status.replace(/_/g, " ");
 
-  // Sections
-  document.getElementById("rep-abstract-text").value = rep.abstract;
-  document.getElementById("rep-intro").textContent = rep.introduction;
-  document.getElementById("rep-methodology").textContent = rep.methodology;
+  const standardView = document.getElementById("manuscript-standard-view");
+  const customView = document.getElementById("manuscript-custom-outline-view");
+  const customContent = document.getElementById("rep-custom-rendered-content");
 
-  // Results
-  const resContainer = document.getElementById("rep-results-container");
-  resContainer.innerHTML = "";
-  rep.results.forEach(r => {
-    const div = document.createElement("div");
-    div.style.marginBottom = "1.5rem";
-    div.innerHTML = `
-      <h3>${escapeHtml(r.title)}</h3>
-      <p>${r.narrative.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</p>
-    `;
-    resContainer.appendChild(div);
-  });
+  if (rep.is_custom_template && rep.rendered_content) {
+    // Show custom template outline view for only this generated report
+    if (standardView) standardView.style.display = "none";
+    if (customView) {
+      customView.style.display = "block";
+      customContent.innerHTML = formatManuscriptMarkdown(rep.rendered_content);
+    }
+  } else {
+    // Show standard predefined template view
+    if (standardView) standardView.style.display = "block";
+    if (customView) customView.style.display = "none";
 
-  document.getElementById("rep-discussion-text").value = rep.discussion;
-  document.getElementById("rep-limitations").textContent = rep.limitations;
-  document.getElementById("rep-conclusions-text").value = rep.conclusions;
-  
-  // Document Grounding Section
-  const docGroundingElem = document.getElementById("rep-doc-grounding");
-  if (docGroundingElem) {
-    docGroundingElem.textContent = rep.document_grounding || "All statistical procedures grounded against APA 7th Edition Reporting Standards.";
+    // Sections
+    document.getElementById("rep-abstract-text").value = rep.abstract || "";
+    document.getElementById("rep-intro").textContent = rep.introduction || "";
+    document.getElementById("rep-methodology").textContent = rep.methodology || "";
+
+    // Results
+    const resContainer = document.getElementById("rep-results-container");
+    if (resContainer) {
+      resContainer.innerHTML = "";
+      (rep.results || []).forEach(r => {
+        const div = document.createElement("div");
+        div.style.marginBottom = "1.5rem";
+        div.innerHTML = `
+          <h3>${escapeHtml(r.title)}</h3>
+          <p>${(r.narrative || "").replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</p>
+        `;
+        resContainer.appendChild(div);
+      });
+    }
+
+    document.getElementById("rep-discussion-text").value = rep.discussion || "";
+    document.getElementById("rep-limitations").textContent = rep.limitations || "";
+    document.getElementById("rep-conclusions-text").value = rep.conclusions || "";
+    
+    // Document Grounding Section
+    const docGroundingElem = document.getElementById("rep-doc-grounding");
+    if (docGroundingElem) {
+      docGroundingElem.textContent = rep.document_grounding || "All statistical procedures grounded against APA 7th Edition Reporting Standards.";
+    }
   }
   
   document.getElementById("human-notes-input").value = rep.human_notes || "";
+}
+
+function formatManuscriptMarkdown(md) {
+  if (!md) return "";
+  const lines = md.split("\n");
+  let html = "";
+  let inTable = false;
+  let tableRows = [];
+
+  function flushTable() {
+    if (tableRows.length === 0) return;
+    const validRows = tableRows.filter(r => !/^\s*\|?\s*:?-+:?\s*\|/.test(r));
+    if (validRows.length === 0) { tableRows = []; return; }
+    let tHtml = '<div style="overflow-x:auto; margin: 1rem 0;"><table style="width:100%; border-collapse: collapse; font-size: 0.92rem; border: 1px solid #cbd5e1;">';
+    validRows.forEach((r, idx) => {
+      const cols = r.split("|").map(c => c.trim()).filter((c, i, a) => i > 0 && i < a.length - 1);
+      const isHeader = (idx === 0);
+      const bg = isHeader ? '#1e3a8a' : (idx % 2 === 0 ? '#f8fafc' : '#ffffff');
+      const color = isHeader ? '#ffffff' : '#1e293b';
+      const weight = isHeader ? '700' : '400';
+      tHtml += `<tr style="background: ${bg}; color: ${color}; font-weight: ${weight};">`;
+      cols.forEach(c => {
+        const cellTag = isHeader ? 'th' : 'td';
+        tHtml += `<${cellTag} style="padding: 6px 12px; border: 1px solid #cbd5e1; text-align: left;">${escapeHtml(c)}</${cellTag}>`;
+      });
+      tHtml += '</tr>';
+    });
+    tHtml += '</table></div>';
+    html += tHtml;
+    tableRows = [];
+  }
+
+  lines.forEach(line => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+      inTable = true;
+      tableRows.push(trimmed);
+      return;
+    } else if (inTable) {
+      flushTable();
+      inTable = false;
+    }
+
+    if (!trimmed) return;
+
+    if (trimmed.startsWith("### ")) {
+      html += `<h3 style="color: #1e3a8a; margin-top: 1.25rem; margin-bottom: 0.5rem; font-size: 1.15rem;">${escapeHtml(trimmed.slice(4))}</h3>`;
+    } else if (trimmed.startsWith("## ")) {
+      html += `<h2 style="color: #1e3a8a; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 0.35rem; margin-top: 1.75rem; margin-bottom: 0.75rem; font-size: 1.35rem;">${escapeHtml(trimmed.slice(3))}</h2>`;
+    } else if (trimmed.startsWith("# ")) {
+      html += `<h1 style="color: #0f172a; margin-top: 1rem; margin-bottom: 0.75rem; font-size: 1.75rem; text-align: center;">${escapeHtml(trimmed.slice(2))}</h1>`;
+    } else if (trimmed === "---") {
+      html += `<hr style="margin: 1.5rem 0; border: none; border-top: 1.5px solid #cbd5e1;">`;
+    } else if (trimmed.startsWith("- ") || trimmed.startsWith("• ") || trimmed.startsWith("* ")) {
+      const itemText = trimmed.replace(/^[-•*]\s+/, "");
+      html += `<li style="margin-left: 1.5rem; margin-bottom: 0.35rem;">${formatInlineMarkdown(itemText)}</li>`;
+    } else {
+      html += `<p style="margin-bottom: 0.85rem; line-height: 1.75;">${formatInlineMarkdown(trimmed)}</p>`;
+    }
+  });
+
+  if (inTable) flushTable();
+  return html;
+}
+
+function formatInlineMarkdown(text) {
+  let res = escapeHtml(text);
+  res = res.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  res = res.replace(/`([^`]+)`/g, '<code style="background:#e2e8f0; padding:2px 4px; border-radius:4px; font-family:monospace; font-size:0.9em;">$1</code>');
+  return res;
 }
 
 function initValidationListeners() {
@@ -862,10 +962,122 @@ function initValidationListeners() {
     });
   }
 
+  // Quick preset outline buttons for manual builder
+  const outlineArea = document.getElementById("manual-rep-outline");
+  const btnPreStd = document.getElementById("btn-outline-preset-std");
+  const btnPreExec = document.getElementById("btn-outline-preset-exec");
+  const btnPreClin = document.getElementById("btn-outline-preset-clinical");
+
+  if (outlineArea) {
+    if (btnPreStd) {
+      btnPreStd.addEventListener("click", () => {
+        outlineArea.value = `# {{title}}
+**Principal Investigator:** {{researcher_name}} | **Date:** {{date}} | **Dataset:** \`{{dataset_name}}\`
+
+---
+
+## Abstract
+{{abstract}}
+
+## 1. Introduction & Research Objectives
+{{introduction}}
+**Primary Research Inquiry:** {{research_objective}}
+
+## 2. Experimental Data Hygiene & Descriptive Profiling
+{{methodology}}
+
+### Table 1: Comprehensive Descriptive Statistics
+{{descriptive_statistics_table}}
+
+### Table 2: Categorical Attribute Distributions
+{{categorical_distribution_table}}
+
+## 3. Inferential Hypothesis Testing & APA 7th Statements
+{{hypothesis_testing_results}}
+
+## 4. Key Comparative Findings
+{{detailed_findings}}
+
+## 5. Scientific Discussion & Laboratory Interpretation
+{{discussion}}
+
+## 6. Methodological Limitations & Validity Threats
+{{limitations}}
+
+## 7. Conclusions & Research Recommendations
+{{conclusions}}
+
+## 8. Document Grounding & Methodology Compliance
+{{document_grounding}}`;
+        showNotification("Loaded Academic Standard outline into builder.", "info");
+      });
+    }
+
+    if (btnPreExec) {
+      btnPreExec.addEventListener("click", () => {
+        outlineArea.value = `# {{title}}
+**Author:** {{researcher_name}} | **Date:** {{date}}
+
+---
+
+## 1. Executive Summary & Objective
+{{abstract}}
+
+**Core Problem Under Study:** {{research_objective}}
+
+## 2. Key Data Insights & Descriptive Summary
+{{descriptive_statistics_table}}
+
+## 3. Primary Empirical Findings & Hypothesis Tests
+{{hypothesis_testing_results}}
+
+## 4. Strategic Discussion & Practical Implications
+{{discussion}}
+
+## 5. Actionable Conclusions & Next Steps
+{{conclusions}}`;
+        showNotification("Loaded Executive Brief outline into builder.", "info");
+      });
+    }
+
+    if (btnPreClin) {
+      btnPreClin.addEventListener("click", () => {
+        outlineArea.value = `# {{title}} (Clinical Evaluation)
+**Lead Investigator:** {{researcher_name}} | **Protocol Date:** {{date}} | **Cohort:** \`{{dataset_name}}\` (N = {{row_count}})
+
+---
+
+## Executive Abstract
+{{abstract}}
+
+## 1. Trial Protocol & Clinical Objectives
+{{introduction}}
+
+**Primary Endpoint Target:** {{research_objective}}
+
+## 2. Baseline Cohort Quality & Preprocessing
+{{methodology}}
+{{descriptive_statistics_table}}
+
+## 3. Primary & Secondary Statistical Analysis
+{{hypothesis_testing_results}}
+
+## 4. Clinical Significance & Discussion
+{{discussion}}
+
+## 5. Safety, Limitations & Conclusions
+{{limitations}}
+{{conclusions}}`;
+        showNotification("Loaded Clinical Cohort outline into builder.", "info");
+      });
+    }
+  }
+
   // 1. Generate Automatic Report
   const btnGenAuto = document.getElementById("btn-generate-report-auto");
   if (btnGenAuto) {
     btnGenAuto.addEventListener("click", async () => {
+      if (!requireActiveDataset("generate an automatic report")) return;
       showNotification("Synthesizing dynamic academic report grounded in active dataset...", "info");
       const repRes = await fetch("/api/report/generate", {
         method: "POST",
@@ -888,16 +1100,18 @@ function initValidationListeners() {
     });
   }
 
-  // 2. Generate Custom Manual Report
+  // 2. Generate Custom Manual Report with Outline
   const btnGenManual = document.getElementById("btn-generate-report-manual");
   if (btnGenManual) {
     btnGenManual.addEventListener("click", async () => {
+      if (!requireActiveDataset("compile a manual report")) return;
       const title = document.getElementById("manual-rep-title")?.value.trim() || "Empirical Research Report";
       const author = document.getElementById("manual-rep-author")?.value.trim() || "Laboratory Researcher";
       const template = document.getElementById("manual-rep-template")?.value || "Standard Empirical Research Report";
       const notes = document.getElementById("manual-rep-notes")?.value.trim() || "";
+      const customOutline = document.getElementById("manual-rep-outline")?.value.trim() || "";
 
-      showNotification("Compiling custom manual report...", "info");
+      showNotification("Compiling custom manual report with template outline...", "info");
       const repRes = await fetch("/api/report/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -905,6 +1119,7 @@ function initValidationListeners() {
           title: title,
           researcher_name: author,
           professor_template: template,
+          custom_template_content: customOutline,
           selected_tests: state.executedTests,
           custom_notes: notes,
           attached_charts: state.reportCharts
@@ -913,7 +1128,7 @@ function initValidationListeners() {
       const data = await repRes.json();
       if (repRes.ok) {
         renderAcademicManuscript(data);
-        showNotification("Custom manual report compiled successfully!", "success");
+        showNotification("Custom manual report compiled with your template outline!", "success");
       } else {
         showNotification(data.detail || "Manual report compilation failed", "danger");
       }
@@ -1101,6 +1316,7 @@ function initQAListeners() {
 
   if (btnUpdateObj) {
     btnUpdateObj.addEventListener("click", async () => {
+      if (!requireActiveDataset("save research objective")) return;
       const obj = document.getElementById("input-objective").value.trim();
       if (!obj) return;
       try {
@@ -1136,6 +1352,7 @@ function initQAListeners() {
 }
 
 async function handleAskDataset() {
+  if (!requireActiveDataset("ask questions regarding dataset")) return;
   const inputQ = document.getElementById("input-dataset-question");
   if (!inputQ) return;
   const q = inputQ.value.trim();
