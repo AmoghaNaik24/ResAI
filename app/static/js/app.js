@@ -1,18 +1,21 @@
 /**
- * ResAI - Front-End Controller
- * Precision Research Data Analysis, Statistical Computation & Reporting
+ * ResAI - Front-End Client-Side Application Controller
+ * 100% In-Browser Precision Research Data Analysis, Hypothesis Testing & Reporting.
+ * Zero external servers, zero backend dependencies, ready for free GitHub Pages deployment.
  */
 
-// Global State
+// Global Application State
 const state = {
-  currentDataset: null,
-  profile: null,
-  objective: "",
+  currentDataset: null,      // Filename string
+  rawRows: [],               // Original parsed data
+  cleanedRows: [],           // Active working data
+  profile: null,             // Active EDA profile
+  objective: "",             // Research inquiry
   activeTab: "upload",
-  currentReport: null,
-  executedTests: [],
-  reportCharts: [],
-  columns: { numeric: [], categorical: [] }
+  currentReport: null,       // Compiled manuscript
+  executedTests: [],         // Statistical results register
+  reportCharts: [],          // Charts attached to report
+  columns: { numeric: [], categorical: [], all: [] }
 };
 
 // DOM Content Loaded
@@ -22,9 +25,13 @@ document.addEventListener("DOMContentLoaded", () => {
   initQAListeners();
   initMethodologyListeners();
   initValidationListeners();
+  initAnalysisListeners();
+  initVisualizationListeners();
 });
 
-// Tab Switching
+// ==========================================
+// Tab Switching & Navigation Guards
+// ==========================================
 function initTabs() {
   const tabBtns = document.querySelectorAll(".nav-tab-btn");
   tabBtns.forEach(btn => {
@@ -36,7 +43,7 @@ function initTabs() {
 }
 
 function requireActiveDataset(actionName = "") {
-  if (!state.currentDataset) {
+  if (!state.currentDataset || !state.cleanedRows || state.cleanedRows.length === 0) {
     showNotification("Dataset not uploaded. Please upload a dataset in Tab 1 first.", "warning");
     switchTab("upload");
     return false;
@@ -45,8 +52,8 @@ function requireActiveDataset(actionName = "") {
 }
 
 function switchTab(tabId) {
-  // Guard: if user attempts to navigate to any tab without an uploaded dataset
-  if (tabId !== "upload" && !state.currentDataset) {
+  // Guard: if user attempts to navigate to data-dependent tabs without an uploaded dataset
+  if (tabId !== "upload" && (!state.currentDataset || !state.cleanedRows || state.cleanedRows.length === 0)) {
     showNotification("Dataset not uploaded. Please upload a dataset in Tab 1 first.", "warning");
     tabId = "upload";
     document.querySelectorAll(".nav-tab-btn").forEach(b => {
@@ -68,7 +75,9 @@ function switchTab(tabId) {
 
   // Dynamic refresh based on tab when dataset is loaded
   if (state.currentDataset) {
-    if (tabId === "analysis") {
+    if (tabId === "eda") {
+      renderEDATab();
+    } else if (tabId === "analysis") {
       populateTestSelectors();
       loadRecommendations();
       loadSummaryStats();
@@ -82,73 +91,143 @@ function switchTab(tabId) {
   }
 }
 
-// Upload & Sample Dataset Management
+// ==========================================
+// In-Browser File Ingestion (PapaParse & SheetJS)
+// ==========================================
 function initUploadListeners() {
   const dropZone = document.getElementById("drop-zone");
   const fileInput = document.getElementById("file-input");
 
-  dropZone.addEventListener("click", () => fileInput.click());
-  fileInput.addEventListener("change", (e) => {
-    if (e.target.files.length > 0) uploadFile(e.target.files[0]);
-  });
-
-  dropZone.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    dropZone.classList.add("dragover");
-  });
-  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
-  dropZone.addEventListener("drop", (e) => {
-    e.preventDefault();
-    dropZone.classList.remove("dragover");
-    if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
-  });
-
-  // Sample dataset buttons
-  document.querySelectorAll("[data-sample]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const sampleType = btn.getAttribute("data-sample");
-      loadSampleDataset(sampleType);
+  if (dropZone && fileInput) {
+    dropZone.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", (e) => {
+      if (e.target.files.length > 0) processLocalFile(e.target.files[0]);
     });
-  });
 
-  // Automated Full Pipeline Buttons
+    dropZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropZone.classList.add("dragover");
+    });
+    dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+    dropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropZone.classList.remove("dragover");
+      if (e.dataTransfer.files.length > 0) processLocalFile(e.dataTransfer.files[0]);
+    });
+  }
+
+  // Header & page-level automatic report generation triggers
   const autoBtn = document.getElementById("btn-run-full-pipeline");
   if (autoBtn) autoBtn.addEventListener("click", runFullAutomatedPipeline);
 
-  // Wire up all page-level automatic report generation triggers
   document.querySelectorAll(".btn-trigger-auto-report").forEach(btn => {
     btn.addEventListener("click", runFullAutomatedPipeline);
   });
 }
 
-async function uploadFile(file) {
-  const objInput = document.getElementById("input-objective");
-  let objective = objInput ? objInput.value.trim() : "";
-  // If the objective text is from the previous clinical sample, let backend auto-synthesize
-  if (objective.includes("Evaluate recovery days and biomarker reduction") || objective.includes("Placebo vs Drug A vs Drug B")) {
-    objective = "";
-  }
+function processLocalFile(file) {
+  if (!file) return;
+  const fileName = file.name;
+  const ext = fileName.split('.').pop().toLowerCase();
 
-  const formData = new FormData();
-  formData.append("file", file);
-  if (objective) {
-    formData.append("objective", objective);
-  }
+  showNotification(`Reading '${fileName}' locally in browser...`, "info");
 
-  showNotification(`Uploading ${file.name}...`, "info");
-  try {
-    const res = await fetch("/api/eda/upload", { method: "POST", body: formData });
-    const data = await res.json();
-    if (res.ok) {
-      applyLoadedDataset(data);
-      showNotification(`Dataset '${file.name}' loaded successfully!`, "success");
-      showUploadSuccessBanner(data.filename, data.profile.total_rows, data.profile.total_columns);
-    } else {
-      showNotification(data.detail || "Error loading dataset", "danger");
+  if (ext === 'csv') {
+    // Client-side PapaParse
+    if (typeof Papa === 'undefined') {
+      showNotification("CSV Parser loading... please wait a moment.", "warning");
+      return;
     }
-  } catch (err) {
-    showNotification("Upload failed: " + err.message, "danger");
+    Papa.parse(file, {
+      header: true,
+      dynamicTyping: true,
+      skipEmptyLines: true,
+      complete: function(results) {
+        if (!results.data || results.data.length === 0) {
+          showNotification("CSV file appears to be empty.", "danger");
+          return;
+        }
+        applyLoadedDataset(results.data, fileName);
+      },
+      error: function(err) {
+        showNotification("CSV parsing error: " + err.message, "danger");
+      }
+    });
+  } else if (ext === 'xlsx' || ext === 'xls') {
+    // Client-side SheetJS (XLSX)
+    if (typeof XLSX === 'undefined') {
+      showNotification("Excel Parser loading... please wait a moment.", "warning");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: null });
+        if (!jsonRows || jsonRows.length === 0) {
+          showNotification("Excel sheet is empty.", "danger");
+          return;
+        }
+        applyLoadedDataset(jsonRows, fileName);
+      } catch (err) {
+        showNotification("Excel read error: " + err.message, "danger");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    showNotification("Unsupported file format. Please upload a .CSV or .XLSX file.", "warning");
   }
+}
+
+function applyLoadedDataset(rows, fileName) {
+  state.currentDataset = fileName;
+  state.rawRows = rows.map(r => ({ ...r }));
+  state.cleanedRows = rows.map(r => ({ ...r }));
+
+  // Profile data
+  state.profile = window.EDAProfiler.profileDataset(state.cleanedRows);
+  state.columns = {
+    numeric: state.profile.numerical_columns || [],
+    categorical: state.profile.categorical_columns || [],
+    all: Object.keys(state.profile.columns || {})
+  };
+
+  // Derive research objective if not specified
+  const objInput = document.getElementById("input-objective");
+  if (!objInput || !objInput.value.trim() || objInput.value.includes("Evaluate recovery days and biomarker reduction")) {
+    const cleanName = fileName.replace(/\.[^/.]+$/, "").replace(/_/g, " ");
+    const num = state.columns.numeric;
+    const cat = state.columns.categorical;
+    let autoObj = `Evaluate empirical relationships in ${cleanName}.`;
+    if (num.length >= 1 && cat.length >= 1) {
+      autoObj = `Investigate variations in ${num[0]} across ${cat[0]} cohorts in ${cleanName}.`;
+    } else if (num.length >= 2) {
+      autoObj = `Assess bivariate associations between ${num[0]} and ${num[1]} in ${cleanName}.`;
+    }
+    state.objective = autoObj;
+    if (objInput) objInput.value = autoObj;
+  } else {
+    state.objective = objInput.value.trim();
+  }
+
+  // Update header status pill
+  const headerDataset = document.getElementById("header-dataset-name");
+  if (headerDataset) headerDataset.textContent = `${fileName} (${state.profile.total_rows.toLocaleString()} rows)`;
+
+  // Show upload success banner
+  showUploadSuccessBanner(fileName, state.profile.total_rows, state.profile.total_columns);
+
+  // Update suggested question pills
+  updateSuggestedQuestions(state.profile);
+
+  // Re-populate dropdowns
+  populateTestSelectors();
+  populateVisualControls();
+
+  showNotification(`Dataset '${fileName}' loaded successfully! (${state.profile.total_rows} records)`, "success");
 }
 
 function showUploadSuccessBanner(filename, rows, cols) {
@@ -166,222 +245,255 @@ function showUploadSuccessBanner(filename, rows, cols) {
           </div>
         </div>
       </div>
-      <div style="display: flex; gap: 0.5rem; align-items: center;">
-        <button class="btn btn-primary btn-sm btn-banner-report" style="font-weight: 600;">⚡ Generate Automatic Report</button>
-        <button class="btn btn-secondary btn-sm" onclick="switchTab('eda')">Data Health ➔</button>
-      </div>
+      <button class="btn btn-primary btn-sm btn-trigger-auto-report" style="box-shadow: 0 2px 4px rgba(37,99,235,0.2);">
+        ⚡ Generate Automatic Report
+      </button>
     </div>
   `;
-  const reportBtn = banner.querySelector(".btn-banner-report");
-  if (reportBtn) reportBtn.addEventListener("click", runFullAutomatedPipeline);
+  banner.querySelector(".btn-trigger-auto-report").addEventListener("click", runFullAutomatedPipeline);
 }
 
-async function loadSampleDataset(sampleType) {
-  showNotification(`Loading pre-configured ${sampleType} dataset...`, "info");
-  const formData = new FormData();
-  formData.append("sample_type", sampleType);
+// ==========================================
+// Tab 2: Data Health & Profiling
+// ==========================================
+function renderEDATab() {
+  if (!state.profile) return;
+  const p = state.profile;
 
-  try {
-    const res = await fetch("/api/eda/load-sample", { method: "POST", body: formData });
-    const data = await res.json();
-    if (res.ok) {
-      applyLoadedDataset(data);
-      showNotification(`Pre-loaded ${data.filename} ready for analysis!`, "success");
-    }
-  } catch (err) {
-    showNotification("Failed to load sample dataset: " + err.message, "danger");
-  }
-}
+  document.getElementById("stat-health-score").textContent = `${p.health_score}%`;
+  document.getElementById("stat-total-rows").textContent = p.total_rows.toLocaleString();
+  document.getElementById("stat-total-cols").textContent = p.total_columns;
+  document.getElementById("stat-missing-cells").textContent = p.total_missing_cells.toLocaleString();
 
-function applyLoadedDataset(data) {
-  state.currentDataset = data.filename;
-  state.objective = data.objective;
-  state.profile = data.profile;
-  state.columns.numeric = data.profile.numerical_columns || [];
-  state.columns.categorical = data.profile.categorical_columns || [];
-
-  // Update Header & UI
-  document.getElementById("header-dataset-name").textContent = data.filename;
-  document.getElementById("input-objective").value = data.objective;
-
-  // Render EDA Profile & Suggested Questions
-  renderEDAProfile(data.profile);
-  populateTestSelectors();
-  updateSuggestedQuestions(data.profile);
-}
-
-// Render Data Quality Assessment & Profiling
-function renderEDAProfile(profile) {
-  document.getElementById("stat-health-score").textContent = `${profile.health_score}%`;
-  document.getElementById("stat-total-rows").textContent = profile.total_rows.toLocaleString();
-  document.getElementById("stat-total-cols").textContent = profile.total_columns;
-  document.getElementById("stat-missing-rate").textContent = `${profile.missing_rate_overall}%`;
-
-  // Color health badge
-  const scoreElem = document.getElementById("stat-health-score");
-  if (profile.health_score >= 85) scoreElem.style.color = "var(--success)";
-  else if (profile.health_score >= 70) scoreElem.style.color = "var(--warning)";
-  else scoreElem.style.color = "var(--danger)";
-
-  // Issues list
-  const issuesContainer = document.getElementById("eda-issues-container");
-  issuesContainer.innerHTML = "";
-  if (profile.issues && profile.issues.length > 0) {
-    profile.issues.forEach(issue => {
-      const div = document.createElement("div");
-      div.className = "recommendation-card";
-      div.style.borderLeft = "4px solid var(--warning)";
-      div.innerHTML = `<span><strong>Data Hygiene Notice:</strong> ${escapeHtml(issue)}</span>`;
-      issuesContainer.appendChild(div);
-    });
-  } else {
-    issuesContainer.innerHTML = `<p style="color: var(--success); font-weight: 600;">✓ Excellent Data Hygiene: No critical missingness, severe outliers, or constant column defects detected.</p>`;
-  }
-
-  // Column Profiling Table
-  const tbody = document.getElementById("eda-columns-tbody");
-  tbody.innerHTML = "";
-  Object.values(profile.columns).forEach(col => {
-    const tr = document.createElement("tr");
-    const isNum = col.type === "numeric";
-    tr.innerHTML = `
-      <td><strong>${escapeHtml(col.name)}</strong></td>
-      <td><span class="badge ${isNum ? 'badge-info' : 'badge-warning'}">${col.type}</span></td>
-      <td>${col.missing_percentage}% (${col.missing_count})</td>
-      <td>${col.unique_values}</td>
-      <td>${isNum ? (col.skewness ?? '0.00') : 'N/A'}</td>
-      <td>${isNum ? (col.outliers_count ?? 0) : 'N/A'}</td>
-      <td>${col.issues.length > 0 ? `<span class="badge badge-danger">${col.issues.length} Note(s)</span>` : '<span class="badge badge-success">Clean</span>'}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  // Sample Records Preview Table
-  renderSamplePreviewTable(profile.sample_records);
-}
-
-function renderSamplePreviewTable(records) {
-  if (!records || records.length === 0) return;
-  const thead = document.getElementById("preview-thead");
-  const tbody = document.getElementById("preview-tbody");
-  thead.innerHTML = "";
-  tbody.innerHTML = "";
-
-  const headers = Object.keys(records[0]);
-  const trHead = document.createElement("tr");
-  headers.forEach(h => {
-    const th = document.createElement("th");
-    th.textContent = h;
-    trHead.appendChild(th);
-  });
-  thead.appendChild(trHead);
-
-  records.forEach(r => {
-    const tr = document.createElement("tr");
-    headers.forEach(h => {
-      const td = document.createElement("td");
-      td.textContent = r[h] !== null ? r[h] : "null";
-      tr.appendChild(td);
-    });
-    tbody.appendChild(tr);
-  });
-}
-
-// 1-Click Data Cleaning
-document.getElementById("btn-clean-data").addEventListener("click", async () => {
-  if (!requireActiveDataset("clean dataset")) return;
-  showNotification("Executing automated dataset cleaning and imputation...", "info");
-  const formData = new FormData();
-  formData.append("drop_duplicates", "true");
-  formData.append("impute_numeric", "median");
-  formData.append("impute_categorical", "mode");
-
-  try {
-    const res = await fetch("/api/eda/clean", { method: "POST", body: formData });
-    const data = await res.json();
-    if (res.ok) {
-      state.profile = data.profile;
-      renderEDAProfile(data.profile);
-      showNotification("Data cleansed! Missing values imputed and duplicates eliminated.", "success");
-    }
-  } catch (err) {
-    showNotification("Cleansing error: " + err.message, "danger");
-  }
-});
-
-// Statistical Analysis & Testing
-async function loadSummaryStats() {
-  try {
-    const res = await fetch("/api/analysis/summary-stats");
-    const data = await res.json();
-    if (!res.ok) return;
-
-    const tbody = document.getElementById("summary-stats-tbody");
-    tbody.innerHTML = "";
-
-    Object.entries(data.numerical_summary || {}).forEach(([col, s]) => {
+  // Missing table
+  const missingTbody = document.getElementById("missing-table-body");
+  if (missingTbody) {
+    missingTbody.innerHTML = "";
+    Object.keys(p.columns || {}).forEach(col => {
+      const c = p.columns[col];
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td><strong>${escapeHtml(col)}</strong></td>
-        <td>${s.mean} ± ${s.std}</td>
-        <td>[${s.ci95[0]}, ${s.ci95[1]}]</td>
-        <td>${s.median} (IQR: ${s.iqr})</td>
-        <td>${s.min} – ${s.max}</td>
-        <td>${s.skewness}</td>
-        <td>${s.is_normally_distributed ? '<span class="badge badge-success">Normal (p > .05)</span>' : '<span class="badge badge-warning">Non-normal</span>'}</td>
+        <td><strong>${escapeHtml(c.name)}</strong></td>
+        <td><span class="badge ${c.type === 'numeric' ? 'badge-info' : 'badge-secondary'}">${c.type}</span></td>
+        <td>${c.missing_count}</td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="progress-bar-container" style="flex: 1;">
+              <div class="progress-bar-fill ${c.missing_percentage > 10 ? 'danger' : ''}" style="width: ${c.missing_percentage}%"></div>
+            </div>
+            <span style="font-size: 0.75rem; width: 35px;">${c.missing_percentage}%</span>
+          </div>
+        </td>
+        <td>${c.unique_values}</td>
+        <td>${c.issues.length > 0 ? `<span class="badge badge-warning">${escapeHtml(c.issues[0])}</span>` : '<span class="badge badge-success">Optimal</span>'}</td>
       `;
-      tbody.appendChild(tr);
+      missingTbody.appendChild(tr);
     });
-  } catch (e) {}
+  }
+
+  // Distribution summary
+  const distContainer = document.getElementById("eda-dist-summary");
+  if (distContainer) {
+    distContainer.innerHTML = `
+      <div style="font-size: 0.9rem; line-height: 1.6; color: #334155;">
+        <p><strong>Continuous Numerical Measures (${p.numerical_columns.length}):</strong> ${p.numerical_columns.map(c => `<code>${escapeHtml(c)}</code>`).join(', ') || 'None'}</p>
+        <p style="margin-top: 0.5rem;"><strong>Categorical Classification Factors (${p.categorical_columns.length}):</strong> ${p.categorical_columns.map(c => `<code>${escapeHtml(c)}</code>`).join(', ') || 'None'}</p>
+        <p style="margin-top: 0.5rem;"><strong>Duplicate Records:</strong> ${p.duplicate_rows} duplicate rows detected.</p>
+      </div>
+    `;
+  }
+
+  // Outlier detection table
+  const outlierTbody = document.getElementById("outlier-table-body");
+  if (outlierTbody) {
+    outlierTbody.innerHTML = "";
+    (p.numerical_columns || []).forEach(col => {
+      const c = p.columns[col];
+      if (c && c.outliers_count !== undefined) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><strong>${escapeHtml(c.name)}</strong></td>
+          <td>${c.outliers_count}</td>
+          <td>${c.outliers_pct}%</td>
+          <td>${c.bounds ? `[${c.bounds[0]}, ${c.bounds[1]}]` : '--'}</td>
+          <td>${c.skewness}</td>
+          <td>${c.outliers_count > 0 ? '<span class="badge badge-warning">Outliers Present</span>' : '<span class="badge badge-success">Clean Bounds</span>'}</td>
+        `;
+        outlierTbody.appendChild(tr);
+      }
+    });
+  }
+
+  // Preview table
+  renderPreviewTable(p.preview_data || state.cleanedRows.slice(0, 8));
 }
 
-async function loadRecommendations() {
-  const container = document.getElementById("recommendations-list");
-  container.innerHTML = `<div class="spinner"></div> Evaluating dataset variables & research questions...`;
+function renderPreviewTable(rows) {
+  const container = document.getElementById("dataset-preview-table-container");
+  if (!container || !rows || rows.length === 0) return;
+  const cols = Object.keys(rows[0]);
 
-  try {
-    const res = await fetch("/api/analysis/recommendations");
-    const recs = await res.json();
-    const list = Array.isArray(recs) ? recs : (recs.recommended_tests || []);
-    container.innerHTML = "";
+  let html = `<div style="overflow-x: auto;"><table class="styled-table" style="width:100%; border-collapse:collapse; font-size:0.85rem;"><thead><tr>`;
+  cols.forEach(c => html += `<th>${escapeHtml(c)}</th>`);
+  html += `</tr></thead><tbody>`;
 
-    if (!list || list.length === 0) {
-      container.innerHTML = `<p class="text-muted">No specific tests recommended for current columns.</p>`;
+  rows.forEach(r => {
+    html += `<tr>`;
+    cols.forEach(c => html += `<td>${escapeHtml(String(r[c] !== null && r[c] !== undefined ? r[c] : ''))}</td>`);
+    html += `</tr>`;
+  });
+  html += `</tbody></table></div>`;
+  container.innerHTML = html;
+}
+
+// 1-Click Clean Data Listener
+const btnClean = document.getElementById("btn-clean-data");
+if (btnClean) {
+  btnClean.addEventListener("click", () => {
+    if (!requireActiveDataset("clean data")) return;
+    const numStrategy = document.getElementById("impute-numeric-strategy")?.value || "median";
+    const catStrategy = document.getElementById("impute-cat-strategy")?.value || "mode";
+
+    const res = window.EDAProfiler.cleanData(state.cleanedRows, {
+      missing_numeric_strategy: numStrategy,
+      missing_categorical_strategy: catStrategy,
+      drop_duplicates: true
+    });
+
+    state.cleanedRows = res.cleanedRows;
+    state.profile = window.EDAProfiler.profileDataset(state.cleanedRows);
+
+    renderEDATab();
+    showNotification(`Data cleaned! ${res.actions.join(' ')}`, "success");
+  });
+}
+
+// ==========================================
+// Tab 3: Hypothesis Testing & Statistical Modeling
+// ==========================================
+function initAnalysisListeners() {
+  document.getElementById("btn-calc-two-sample")?.addEventListener("click", () => {
+    if (!requireActiveDataset("run statistical tests")) return;
+    const cont = document.getElementById("ts-continuous").value;
+    const grp = document.getElementById("ts-group").value;
+    executeTest("two_sample_test", { continuous_col: cont, group_col: grp });
+  });
+
+  document.getElementById("btn-calc-anova")?.addEventListener("click", () => {
+    if (!requireActiveDataset("run statistical tests")) return;
+    const cont = document.getElementById("anova-continuous").value;
+    const grp = document.getElementById("anova-group").value;
+    executeTest("anova_test", { continuous_col: cont, group_col: grp });
+  });
+
+  document.getElementById("btn-calc-correlation")?.addEventListener("click", () => {
+    if (!requireActiveDataset("run statistical tests")) return;
+    const method = document.getElementById("corr-method").value;
+    const numCols = state.columns.numeric;
+    if (numCols.length < 2) {
+      showNotification("Correlation requires at least 2 numerical columns.", "warning");
       return;
     }
+    executeTest("correlation_analysis", { col1: numCols[0], col2: numCols[1], method: method });
+  });
 
-    list.forEach(rec => {
-      const div = document.createElement("div");
-      div.className = "recommendation-card";
-      div.innerHTML = `
-        <div>
-          <div style="font-weight: 700; color: #1e3a8a;">${escapeHtml(rec.name)}</div>
-          <div style="font-size: 0.82rem; color: #475569; margin-top: 2px;">${escapeHtml(rec.reason)}</div>
-        </div>
-        <button class="btn btn-primary btn-sm btn-run-rec">Compute Test</button>
-      `;
+  document.getElementById("btn-calc-chi")?.addEventListener("click", () => {
+    if (!requireActiveDataset("run statistical tests")) return;
+    const v1 = document.getElementById("chi-var1").value;
+    const v2 = document.getElementById("chi-var2").value;
+    executeTest("chi_square_test", { var1: v1, var2: v2 });
+  });
 
-      div.querySelector(".btn-run-rec").addEventListener("click", () => {
-        executeSpecificTest(rec.test, rec.params);
-      });
+  document.getElementById("btn-calc-reg")?.addEventListener("click", () => {
+    if (!requireActiveDataset("run statistical tests")) return;
+    const target = document.getElementById("reg-target").value;
+    const checkboxes = document.querySelectorAll(".reg-pred-chk:checked");
+    const preds = Array.from(checkboxes).map(c => c.value).filter(c => c !== target);
+    if (preds.length === 0) {
+      showNotification("Select at least one predictor distinct from the target.", "warning");
+      return;
+    }
+    executeTest("linear_regression", { target_col: target, feature_cols: preds });
+  });
+}
 
-      container.appendChild(div);
-    });
-  } catch (err) {
-    container.innerHTML = `<p class="text-danger">Failed to generate recommendations.</p>`;
+function executeTest(testType, params) {
+  if (!window.StatisticalEngine) return;
+  showNotification("Computing exact statistical verification in browser...", "info");
+
+  let result;
+  if (testType === "two_sample_test") {
+    result = window.StatisticalEngine.twoSampleTest(state.cleanedRows, params.continuous_col, params.group_col);
+  } else if (testType === "anova_test") {
+    result = window.StatisticalEngine.anovaTest(state.cleanedRows, params.continuous_col, params.group_col);
+  } else if (testType === "correlation_analysis") {
+    result = window.StatisticalEngine.correlationAnalysis(state.cleanedRows, params.col1, params.col2, params.method);
+  } else if (testType === "chi_square_test") {
+    result = window.StatisticalEngine.chiSquareTest(state.cleanedRows, params.var1, params.var2);
+  } else if (testType === "linear_regression") {
+    result = window.StatisticalEngine.linearRegression(state.cleanedRows, params.target_col, params.feature_cols);
   }
+
+  if (!result || result.error) {
+    showNotification(result?.error || "Calculation failed", "danger");
+    return;
+  }
+
+  state.executedTests.push(result);
+  renderTestResultCard(result, testType, params);
+  showNotification("Statistical test computed with exact mathematical verification!", "success");
+}
+
+function renderTestResultCard(result, testType, params) {
+  const container = document.getElementById("test-results-stream");
+  if (!container) return;
+
+  const card = document.createElement("div");
+  card.className = "card";
+  card.style.marginBottom = "1.5rem";
+  card.style.borderLeft = result.is_significant ? "4px solid #10b981" : "4px solid #f59e0b";
+  card.style.animation = "fadeIn 0.3s ease";
+
+  const isSig = result.is_significant;
+  const statusBadge = isSig ? '<span class="badge badge-success">p < .05 Significant</span>' : '<span class="badge badge-warning">p ≥ .05 Not Significant</span>';
+
+  card.innerHTML = `
+    <div class="card-header-flex">
+      <div>
+        <h3 style="font-size: 1.15rem; color: #1e3a8a; margin-bottom: 2px;">${escapeHtml(result.test_type || testType)}</h3>
+        <div style="font-size: 0.8rem; color: #64748b;">Deterministic SciPy-Equivalent Mathematical Execution</div>
+      </div>
+      <div>${statusBadge}</div>
+    </div>
+
+    <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.85rem; margin: 0.75rem 0;">
+      <div style="font-size: 0.8rem; color: #475569; font-weight: 600; margin-bottom: 2px;">Official APA 7th Edition Statement:</div>
+      <div style="font-family: var(--font-mono); font-size: 0.95rem; color: #1e3a8a; font-weight: 700;">${escapeHtml(result.formatted_apa || result.apa_statement || '')}</div>
+    </div>
+
+    <p style="font-size: 0.9rem; color: #334155; line-height: 1.6; margin-bottom: 0.75rem;">
+      ${escapeHtml(result.interpretation || result.narrative || '')}
+    </p>
+
+    <div style="display: flex; gap: 0.5rem;">
+      <button class="btn btn-secondary btn-sm btn-dismiss-test" style="font-size: 0.75rem;">Dismiss</button>
+    </div>
+  `;
+
+  card.querySelector(".btn-dismiss-test").addEventListener("click", () => card.remove());
+  container.prepend(card);
 }
 
 function populateTestSelectors() {
-  const populateOptions = (elemId, list) => {
-    const el = document.getElementById(elemId);
-    if (!el) return;
-    el.innerHTML = "";
-    list.forEach(item => {
+  const populateOptions = (selectId, colList) => {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    sel.innerHTML = "";
+    colList.forEach(col => {
       const opt = document.createElement("option");
-      opt.value = item;
-      opt.textContent = item;
-      el.appendChild(opt);
+      opt.value = col;
+      opt.textContent = col;
+      sel.appendChild(opt);
     });
   };
 
@@ -410,405 +522,523 @@ function populateTestSelectors() {
   }
 }
 
-// Execute Tests
-document.getElementById("btn-calc-two-sample").addEventListener("click", () => {
-  const cont = document.getElementById("ts-continuous").value;
-  const grp = document.getElementById("ts-group").value;
-  executeSpecificTest("two_sample_test", { continuous_col: cont, group_col: grp });
-});
+function loadRecommendations() {
+  if (!window.StatisticalEngine) return;
+  const container = document.getElementById("recs-container");
+  if (!container) return;
 
-document.getElementById("btn-calc-anova").addEventListener("click", () => {
-  const cont = document.getElementById("anova-continuous").value;
-  const grp = document.getElementById("anova-group").value;
-  executeSpecificTest("anova_test", { continuous_col: cont, group_col: grp });
-});
+  const recs = window.StatisticalEngine.autoRecommendAnalysis(state.cleanedRows, state.columns, state.objective);
+  container.innerHTML = "";
 
-document.getElementById("btn-calc-correlation").addEventListener("click", () => {
-  const method = document.getElementById("corr-method").value;
-  executeSpecificTest("correlation_analysis", { method: method });
-});
-
-document.getElementById("btn-calc-chi").addEventListener("click", () => {
-  const v1 = document.getElementById("chi-var1").value;
-  const v2 = document.getElementById("chi-var2").value;
-  executeSpecificTest("chi_square_test", { var1: v1, var2: v2 });
-});
-
-document.getElementById("btn-calc-reg").addEventListener("click", () => {
-  const target = document.getElementById("reg-target").value;
-  const checkboxes = document.querySelectorAll(".reg-pred-chk:checked");
-  const preds = Array.from(checkboxes).map(c => c.value).filter(c => c !== target);
-  if (preds.length === 0) {
-    showNotification("Select at least one predictor distinct from the target.", "warning");
+  if (recs.length === 0) {
+    container.innerHTML = `<p class="text-muted">No specific statistical tests recommended for current column structure.</p>`;
     return;
   }
-  executeSpecificTest("linear_regression", { target_col: target, feature_cols: preds });
-});
 
-async function executeSpecificTest(testType, params) {
-  if (!requireActiveDataset("run statistical tests")) return;
-  showNotification(`Computing rigorous mathematical test via Python...`, "info");
-  let url = "";
-  let body = params || {};
-
-  if (testType === "two_sample_test" || testType === "two_sample") {
-    url = "/api/analysis/two-sample";
-  } else if (testType === "anova_test" || testType === "anova") {
-    url = "/api/analysis/anova";
-  } else if (testType === "correlation_analysis" || testType === "correlation") {
-    url = "/api/analysis/correlation";
-  } else if (testType === "chi_square_test" || testType === "chi_square") {
-    url = "/api/analysis/chi-square";
-  } else if (testType === "linear_regression" || testType === "regression") {
-    url = "/api/analysis/regression";
-  } else {
-    url = "/api/analysis/run-test";
-    body = { test_type: testType, ...params };
-  }
-
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
+  recs.forEach(r => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.marginBottom = "0.75rem";
+    card.style.padding = "0.85rem 1.1rem";
+    card.innerHTML = `
+      <div class="card-header-flex">
+        <div>
+          <div style="font-weight: 700; color: #1e3a8a;">${escapeHtml(r.name)}</div>
+          <div style="font-size: 0.82rem; color: #64748b; margin-top: 2px;">${escapeHtml(r.reason)}</div>
+        </div>
+        <button class="btn btn-secondary btn-sm btn-run-rec">Run Test</button>
+      </div>
+    `;
+    card.querySelector(".btn-run-rec").addEventListener("click", () => {
+      executeTest(r.test, r.params);
     });
-    const result = await res.json();
-    if (!res.ok) {
-      showNotification(result.detail || "Calculation error", "danger");
-      return;
-    }
-
-    state.executedTests.push({ test: testType, params: params, result: result });
-    renderTestResultCard(result, testType, params);
-    showNotification("Statistical test computed with exact mathematical verification!", "success");
-  } catch (err) {
-    showNotification("Computation failed: " + err.message, "danger");
-  }
+    container.appendChild(card);
+  });
 }
 
-function renderTestResultCard(res) {
-  const container = document.getElementById("test-results-log");
-  const card = document.createElement("div");
-  card.className = "card";
-  card.style.borderLeft = "5px solid var(--primary)";
-  card.style.animation = "fadeIn 0.3s ease";
+function loadSummaryStats() {
+  if (!window.StatisticalEngine) return;
+  const s = window.StatisticalEngine.getSummaryStatistics(state.cleanedRows, state.columns);
+  const container = document.getElementById("summary-stats-container");
+  if (!container) return;
 
-  const isSig = res.is_significant;
-  const apa = res.formatted_apa || "Computed";
+  const numMap = s.numerical_summary || {};
+  let html = `<div style="overflow-x:auto;"><table class="styled-table" style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+    <thead><tr><th>Measure</th><th>N</th><th>Mean (SD)</th><th>95% CI</th><th>Median</th><th>IQR</th><th>Min - Max</th><th>Outliers</th></tr></thead><tbody>`;
 
-  let detailHtml = "";
-  if (res.test_type === "Two-Sample Comparison") {
-    detailHtml = `
-      <div class="grid-2" style="margin-top: 1rem;">
-        <div class="stat-box">
-          <div style="font-weight: 700; color: #1e3a8a;">${res.group_1.name} (n=${res.group_1.n})</div>
-          <div>Mean: ${res.group_1.mean} (SD: ${res.group_1.std})</div>
-          <div style="font-size: 0.8rem; color: #64748b;">Median: ${res.group_1.median}</div>
-        </div>
-        <div class="stat-box">
-          <div style="font-weight: 700; color: #1e3a8a;">${res.group_2.name} (n=${res.group_2.n})</div>
-          <div>Mean: ${res.group_2.mean} (SD: ${res.group_2.std})</div>
-          <div style="font-size: 0.8rem; color: #64748b;">Median: ${res.group_2.median}</div>
-        </div>
-      </div>
-      <div style="margin-top: 0.8rem; font-size: 0.9rem;">
-        <strong>Effect Size:</strong> ${res.effect_size.metric} = ${res.effect_size.value} (${res.effect_size.magnitude}) | 
-        <strong>Procedure:</strong> ${res.recommended_test} (Levene p = ${res.levene_test.p_value})
-      </div>
-    `;
-  } else if (res.test_type === "One-Way ANOVA") {
-    detailHtml = `
-      <div style="margin-top: 0.8rem; font-size: 0.9rem;">
-        <strong>Omnibus Effect:</strong> η² = ${res.eta_squared} | <strong>Non-parametric Kruskal-Wallis:</strong> H = ${res.kruskal_wallis.h_statistic} (p = ${res.kruskal_wallis.p_value})
-      </div>
-      ${res.post_hoc_tukey && res.post_hoc_tukey.length > 0 ? `
-        <div style="margin-top: 0.5rem; font-size: 0.85rem;">
-          <strong>Post-hoc Pairwise Comparisons (Tukey HSD):</strong>
-          <ul style="margin-left: 1.5rem; margin-top: 0.3rem;">
-            ${res.post_hoc_tukey.map(t => `<li>${t.group1} vs ${t.group2}: Diff = ${t.mean_diff}, p = ${t.p_adj} (${t.reject_null ? '<strong style="color:var(--success)">Significant</strong>' : 'Not Sig'})</li>`).join('')}
-          </ul>
-        </div>
-      ` : ''}
-    `;
-  } else if (res.test_type === "OLS Linear Regression") {
-    detailHtml = `
-      <div style="margin-top: 0.8rem; font-size: 0.9rem;">
-        <strong>Model Fit:</strong> R² = ${res.r_squared} (Adj R² = ${res.adjusted_r_squared}) | F = ${res.f_statistic} (p = ${res.f_p_value})
-      </div>
-      <div class="table-container" style="margin-top: 0.75rem;">
-        <table class="data-table">
-          <thead><tr><th>Predictor</th><th>Coefficient (β)</th><th>Std Err</th><th>t-stat</th><th>p-value</th><th>Sig</th></tr></thead>
-          <tbody>
-            ${res.coefficients.map(c => `
-              <tr>
-                <td><strong>${c.variable}</strong></td>
-                <td>${c.coefficient}</td>
-                <td>${c.std_err}</td>
-                <td>${c.t_statistic}</td>
-                <td>${c.p_value}</td>
-                <td>${c.is_significant ? '<span class="badge badge-success">p < .05</span>' : '<span class="badge badge-warning">n.s.</span>'}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
-  } else if (res.test_type === "Chi-Square Test of Independence") {
-    detailHtml = `
-      <div style="margin-top: 0.8rem; font-size: 0.9rem;">
-        <strong>Independence Evaluation:</strong> χ² = ${res.chi2_statistic} (df = ${res.degrees_of_freedom}, N = ${res.sample_size}) | <strong>Cramér's V:</strong> ${res.cramers_v}
-      </div>
-    `;
-  }
-
-  card.innerHTML = `
-    <div class="card-header-flex">
-      <div>
-        <div class="card-title">${res.test_type}</div>
-        <div class="card-subtitle">APA Reporting Syntax: <strong style="color: #1e3a8a;">${apa}</strong></div>
-      </div>
-      <span class="badge ${isSig ? 'badge-success' : 'badge-warning'}">
-        ${isSig ? 'Statistically Significant (p < .05)' : 'Null Hypothesis Retained (p ≥ .05)'}
-      </span>
-    </div>
-    ${detailHtml}
-    <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); font-size: 0.85rem; color: #475569;">
-      💡 <em>Researcher Summary:</em> ${isSig ? 'Empirical evidence rejects the null hypothesis at the α = 0.05 threshold. The observed effect demonstrates mathematical significance.' : 'No statistically significant divergence detected from the null expectation at α = 0.05. Sample size or effect magnitude may warrant further replication.'}
-    </div>
-  `;
-
-  container.prepend(card);
+  Object.keys(numMap).forEach(col => {
+    const item = numMap[col];
+    html += `<tr>
+      <td><strong>${escapeHtml(col)}</strong></td>
+      <td>${item.count}</td>
+      <td>${item.mean} (${item.std})</td>
+      <td>[${item.ci95[0]}, ${item.ci95[1]}]</td>
+      <td>${item.median}</td>
+      <td>${item.iqr}</td>
+      <td>${item.min} - ${item.max}</td>
+      <td>${item.outliers_count > 0 ? `<span class="badge badge-warning">${item.outliers_count}</span>` : '<span class="badge badge-success">0</span>'}</td>
+    </tr>`;
+  });
+  html += `</tbody></table></div>`;
+  container.innerHTML = html;
 }
 
-// Visualizations
+// ==========================================
+// Tab 4: Publication Visualizations (Plotly.js)
+// ==========================================
+function initVisualizationListeners() {
+  document.getElementById("btn-render-box")?.addEventListener("click", () => {
+    if (!requireActiveDataset("render scientific visualizations")) return;
+    const cat = document.getElementById("vis-box-group").value;
+    const num = document.getElementById("vis-box-numeric").value;
+    renderClientBoxPlot(cat, num);
+  });
+
+  document.getElementById("btn-render-hist")?.addEventListener("click", () => {
+    if (!requireActiveDataset("render scientific visualizations")) return;
+    const col = document.getElementById("vis-hist-col").value;
+    const bins = parseInt(document.getElementById("vis-hist-bins").value) || 20;
+    renderClientHistogram(col, bins);
+  });
+
+  document.getElementById("btn-render-bar")?.addEventListener("click", () => {
+    if (!requireActiveDataset("render scientific visualizations")) return;
+    const cat = document.getElementById("vis-bar-cat").value;
+    const num = document.getElementById("vis-bar-num").value;
+    renderClientBarChart(cat, num);
+  });
+
+  document.getElementById("btn-render-scatter")?.addEventListener("click", () => {
+    if (!requireActiveDataset("render scientific visualizations")) return;
+    const x = document.getElementById("vis-scat-x").value;
+    const y = document.getElementById("vis-scat-y").value;
+    renderClientScatter(x, y);
+  });
+
+  document.getElementById("btn-render-violin")?.addEventListener("click", () => {
+    if (!requireActiveDataset("render scientific visualizations")) return;
+    const cat = document.getElementById("vis-violin-group").value;
+    const num = document.getElementById("vis-violin-numeric").value;
+    renderClientViolin(cat, num);
+  });
+
+  document.getElementById("btn-render-pie")?.addEventListener("click", () => {
+    if (!requireActiveDataset("render scientific visualizations")) return;
+    const col = document.getElementById("vis-pie-cat").value;
+    renderClientPie(col);
+  });
+
+  document.getElementById("btn-render-line")?.addEventListener("click", () => {
+    if (!requireActiveDataset("render scientific visualizations")) return;
+    const x = document.getElementById("vis-line-x").value;
+    const y = document.getElementById("vis-line-y").value;
+    renderClientLine(x, y);
+  });
+}
+
 function populateVisualControls() {
-  const populate = (elemId, list) => {
-    const el = document.getElementById(elemId);
-    if (!el) return;
-    el.innerHTML = "";
-    list.forEach(item => {
+  const populateOptions = (selectId, colList) => {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    sel.innerHTML = "";
+    colList.forEach(col => {
       const opt = document.createElement("option");
-      opt.value = item;
-      opt.textContent = item;
-      el.appendChild(opt);
+      opt.value = col;
+      opt.textContent = col;
+      sel.appendChild(opt);
     });
   };
 
-  populate("vis-dist-col", state.columns.numeric);
-  populate("vis-dist-group", ["None", ...state.columns.categorical]);
-  populate("vis-box-cont", state.columns.numeric);
-  populate("vis-box-grp", state.columns.categorical);
-  populate("vis-scat-x", state.columns.numeric);
-  populate("vis-scat-y", state.columns.numeric);
-
-  // Bar chart options (Category + Optional Continuous Metric + Subgroup)
-  const catList = state.columns.categorical.length > 0 ? state.columns.categorical : state.columns.numeric;
-  populate("vis-bar-cat", catList);
-  populate("vis-bar-num", ["None", ...state.columns.numeric]);
-  populate("vis-bar-sub", ["None", ...state.columns.categorical]);
-
-  // Pie & Donut options
-  populate("vis-pie-cat", catList);
-
-  // Line & Trend options
-  populate("vis-line-x", state.columns.numeric);
-  populate("vis-line-y", state.columns.numeric);
-}
-
-async function loadHeatmap() {
-  try {
-    const res = await fetch("/api/analysis/visualize/heatmap");
-    const data = await res.json();
-    if (data.plotly_json) {
-      const fig = JSON.parse(data.plotly_json);
-      Plotly.newPlot("plot-heatmap-container", fig.data, fig.layout, { responsive: true });
-    }
-  } catch (e) {}
-}
-
-const btnDist = document.getElementById("btn-render-dist");
-if (btnDist) {
-  btnDist.addEventListener("click", async () => {
-    const col = document.getElementById("vis-dist-col")?.value;
-    const grp = document.getElementById("vis-dist-group")?.value;
-    const url = grp && grp !== "None" 
-      ? `/api/analysis/visualize/distribution?col1=${col}&group_by=${grp}`
-      : `/api/analysis/visualize/distribution?col1=${col}`;
-    renderPlotlyChart(url, "plot-custom-container");
-  });
-}
-
-const btnBox = document.getElementById("btn-render-box");
-if (btnBox) {
-  btnBox.addEventListener("click", async () => {
-    const cont = document.getElementById("vis-box-cont")?.value;
-    const grp = document.getElementById("vis-box-grp")?.value;
-    renderPlotlyChart(`/api/analysis/visualize/box_violin?col1=${cont}&col2=${grp}`, "plot-custom-container");
-  });
-}
-
-const btnScatter = document.getElementById("btn-render-scatter");
-if (btnScatter) {
-  btnScatter.addEventListener("click", async () => {
-    const x = document.getElementById("vis-scat-x")?.value;
-    const y = document.getElementById("vis-scat-y")?.value;
-    renderPlotlyChart(`/api/analysis/visualize/scatter?col1=${x}&col2=${y}`, "plot-custom-container");
-  });
-}
-
-const btnBar = document.getElementById("btn-render-bar");
-if (btnBar) {
-  btnBar.addEventListener("click", async () => {
-    const cat = document.getElementById("vis-bar-cat")?.value;
-    const num = document.getElementById("vis-bar-num")?.value;
-    const sub = document.getElementById("vis-bar-sub")?.value;
-    let url = `/api/analysis/visualize/bar?col1=${encodeURIComponent(cat)}`;
-    if (num && num !== "None") url += `&col2=${encodeURIComponent(num)}`;
-    if (sub && sub !== "None") url += `&group_by=${encodeURIComponent(sub)}`;
-    renderPlotlyChart(url, "plot-custom-container");
-  });
-}
-
-const btnPie = document.getElementById("btn-render-pie");
-if (btnPie) {
-  btnPie.addEventListener("click", async () => {
-    const cat = document.getElementById("vis-pie-cat")?.value;
-    const style = document.getElementById("vis-pie-style")?.value || "donut";
-    renderPlotlyChart(`/api/analysis/visualize/${style}?col1=${encodeURIComponent(cat)}`, "plot-custom-container");
-  });
-}
-
-const btnLine = document.getElementById("btn-render-line");
-if (btnLine) {
-  btnLine.addEventListener("click", async () => {
-    const x = document.getElementById("vis-line-x")?.value;
-    const y = document.getElementById("vis-line-y")?.value;
-    renderPlotlyChart(`/api/analysis/visualize/line?col1=${encodeURIComponent(x)}&col2=${encodeURIComponent(y)}`, "plot-custom-container");
-  });
+  populateOptions("vis-box-group", state.columns.categorical);
+  populateOptions("vis-box-numeric", state.columns.numeric);
+  populateOptions("vis-hist-col", state.columns.numeric);
+  populateOptions("vis-bar-cat", state.columns.categorical);
+  populateOptions("vis-bar-num", state.columns.numeric);
+  populateOptions("vis-scat-x", state.columns.numeric);
+  populateOptions("vis-scat-y", state.columns.numeric);
+  populateOptions("vis-violin-group", state.columns.categorical);
+  populateOptions("vis-violin-numeric", state.columns.numeric);
+  populateOptions("vis-pie-cat", state.columns.categorical);
+  populateOptions("vis-line-x", state.columns.all);
+  populateOptions("vis-line-y", state.columns.numeric);
 }
 
 let chartStreamCounter = 0;
 
-async function renderPlotlyChart(apiUrl, containerId, chartLabel) {
-  if (!requireActiveDataset("render scientific visualizations")) return;
-  try {
-    showNotification("Rendering publication-grade visualization...", "info");
-    const res = await fetch(apiUrl);
-    const data = await res.json();
-    if (!res.ok || data.error) {
-      showNotification(data.detail || data.error || "Visualization failed", "danger");
-      return;
+function createChartCard(title, chartType) {
+  chartStreamCounter++;
+  const container = document.getElementById("plot-custom-container");
+  if (!container) return null;
+
+  const chartId = `plotly-stream-${chartStreamCounter}`;
+  const card = document.createElement("div");
+  card.className = "card chart-stream-card";
+  card.style.marginBottom = "1.5rem";
+  card.style.border = "1px solid var(--border-color)";
+
+  card.innerHTML = `
+    <div class="card-header-flex">
+      <div>
+        <div style="font-weight: 700; color: #1e3a8a; font-size: 1.05rem;">${escapeHtml(title)}</div>
+        <div style="font-size: 0.8rem; color: #64748b;">${escapeHtml(chartType)} &bull; Interactive Publication Figure</div>
+      </div>
+      <div style="display: flex; gap: 0.4rem;">
+        <button class="btn btn-secondary btn-sm btn-add-chart-report">➕ Add to Report</button>
+        <button class="btn btn-secondary btn-sm btn-remove-chart">✕</button>
+      </div>
+    </div>
+    <div id="${chartId}" style="width: 100%; height: 420px; margin-top: 0.5rem;"></div>
+  `;
+
+  // Attach / Detach to report listener
+  const addBtn = card.querySelector(".btn-add-chart-report");
+  let isAdded = false;
+  addBtn.addEventListener("click", () => {
+    isAdded = !isAdded;
+    if (isAdded) {
+      state.reportCharts.push({ chartId, title, chartType });
+      addBtn.innerHTML = "✓ Attached to Report";
+      addBtn.classList.add("btn-success");
+      addBtn.classList.remove("btn-secondary");
+      showNotification(`Attached "${title}" to draft manuscript.`, "success");
+    } else {
+      state.reportCharts = state.reportCharts.filter(c => c.chartId !== chartId);
+      addBtn.innerHTML = "➕ Add to Report";
+      addBtn.classList.remove("btn-success");
+      addBtn.classList.add("btn-secondary");
+      showNotification(`Removed "${title}" from report.`, "info");
     }
+  });
 
-    if (data.plotly_json) {
-      const fig = JSON.parse(data.plotly_json);
-      const streamContainer = document.getElementById(containerId);
-      if (!streamContainer) return;
+  card.querySelector(".btn-remove-chart").addEventListener("click", () => {
+    state.reportCharts = state.reportCharts.filter(c => c.chartId !== chartId);
+    card.remove();
+  });
 
-      chartStreamCounter++;
-      const chartId = `plotly-stream-item-${chartStreamCounter}`;
-      const title = chartLabel || fig.layout?.title?.text || `Scientific Figure #${chartStreamCounter}`;
-
-      const card = document.createElement("div");
-      card.className = "card chart-stream-card";
-      card.style.marginBottom = "1.5rem";
-      card.style.boxShadow = "0 4px 6px -1px rgba(0,0,0,0.06)";
-      card.style.border = "1px solid var(--border-color)";
-      card.style.animation = "fadeIn 0.3s ease";
-
-      card.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
-          <div>
-            <h3 style="font-size: 1.05rem; font-weight: 700; color: #1e3a8a; margin: 0;">${escapeHtml(title)}</h3>
-            <span style="font-size: 0.75rem; color: #64748b;">Figure Type: <strong>${escapeHtml(data.chart_type || 'Plot')}</strong> &bull; Generated: ${new Date().toLocaleTimeString()}</span>
-          </div>
-          <div style="display: flex; gap: 0.5rem; align-items: center;">
-            <button class="btn btn-secondary btn-sm btn-add-chart-report" data-chart-id="${chartId}">
-              ➕ Add to Report
-            </button>
-            <button class="btn btn-sm btn-remove-chart" title="Remove chart" style="background: #fee2e2; color: #b91c1c; border: none; padding: 4px 8px; border-radius: 6px; cursor: pointer;">
-              🗑️
-            </button>
-          </div>
-        </div>
-        <div id="${chartId}" style="min-height: 420px;"></div>
-      `;
-
-      // Prepend so previous charts go down!
-      streamContainer.prepend(card);
-
-      // Render Plotly chart in this card's specific div
-      Plotly.newPlot(chartId, fig.data, fig.layout, { responsive: true });
-
-      // Add to Report listener
-      const addBtn = card.querySelector(".btn-add-chart-report");
-      addBtn.addEventListener("click", () => {
-        const isAdded = state.reportCharts.some(c => c.chartId === chartId);
-        if (!isAdded) {
-          state.reportCharts.push({
-            chartId: chartId,
-            title: title,
-            chartType: data.chart_type || "Visualization",
-            plotly_json: data.plotly_json
-          });
-          addBtn.innerHTML = "✓ Added to Report";
-          addBtn.classList.remove("btn-secondary");
-          addBtn.classList.add("btn-success");
-          showNotification(`Added "${title}" to your draft report!`, "success");
-        } else {
-          state.reportCharts = state.reportCharts.filter(c => c.chartId !== chartId);
-          addBtn.innerHTML = "➕ Add to Report";
-          addBtn.classList.remove("btn-success");
-          addBtn.classList.add("btn-secondary");
-          showNotification(`Removed "${title}" from draft report.`, "info");
-        }
-      });
-
-      // Remove chart listener
-      card.querySelector(".btn-remove-chart").addEventListener("click", () => {
-        state.reportCharts = state.reportCharts.filter(c => c.chartId !== chartId);
-        card.remove();
-      });
-
-      showNotification(`Generated: ${title}`, "success");
-    }
-  } catch (err) {
-    showNotification("Chart render error: " + err.message, "danger");
-  }
+  container.prepend(card);
+  return chartId;
 }
 
-// 1-Click Automated Pipeline
-async function runFullAutomatedPipeline() {
+function renderClientBoxPlot(catCol, numCol) {
+  const chartId = createChartCard(`Box Plot of ${numCol} across ${catCol}`, "Comparative Distribution");
+  if (!chartId || typeof Plotly === 'undefined') return;
+
+  const groups = {};
+  state.cleanedRows.forEach(r => {
+    const g = String(r[catCol] || 'Other').trim();
+    const v = Number(r[numCol]);
+    if (!isNaN(v)) {
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(v);
+    }
+  });
+
+  const traces = Object.keys(groups).map(g => ({
+    y: groups[g],
+    type: 'box',
+    name: g,
+    boxpoints: 'all',
+    jitter: 0.3,
+    pointpos: -1.8,
+    marker: { size: 4 }
+  }));
+
+  const layout = {
+    title: { text: `Distribution of ${numCol} across ${catCol}`, font: { size: 14 } },
+    yaxis: { title: numCol },
+    xaxis: { title: catCol },
+    margin: { t: 40, b: 40, l: 60, r: 20 }
+  };
+
+  Plotly.newPlot(chartId, traces, layout, { responsive: true });
+}
+
+function renderClientHistogram(col, bins = 20) {
+  const chartId = createChartCard(`Histogram & Distribution of ${col}`, "Univariate Frequency");
+  if (!chartId || typeof Plotly === 'undefined') return;
+
+  const vals = state.cleanedRows.map(r => Number(r[col])).filter(v => !isNaN(v));
+  const trace = {
+    x: vals,
+    type: 'histogram',
+    nbinsx: bins,
+    marker: { color: '#3b82f6', line: { color: '#1e3a8a', width: 1 } }
+  };
+
+  const layout = {
+    title: { text: `Frequency Distribution of ${col}`, font: { size: 14 } },
+    xaxis: { title: col },
+    yaxis: { title: "Frequency (Count)" },
+    margin: { t: 40, b: 40, l: 60, r: 20 }
+  };
+
+  Plotly.newPlot(chartId, [trace], layout, { responsive: true });
+}
+
+function renderClientBarChart(catCol, numCol) {
+  const chartId = createChartCard(`Research Bar Chart: Mean ${numCol} by ${catCol}`, "Group Means & Error Bars");
+  if (!chartId || typeof Plotly === 'undefined') return;
+
+  const groups = {};
+  state.cleanedRows.forEach(r => {
+    const g = String(r[catCol] || 'Other').trim();
+    const v = Number(r[numCol]);
+    if (!isNaN(v)) {
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(v);
+    }
+  });
+
+  const categories = Object.keys(groups);
+  const means = [];
+  const errors = [];
+
+  categories.forEach(g => {
+    const arr = groups[g];
+    const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+    const variance = arr.length > 1 ? arr.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (arr.length - 1) : 0;
+    const sem = arr.length > 1 ? Math.sqrt(variance) / Math.sqrt(arr.length) : 0;
+    means.push(mean);
+    errors.push(sem);
+  });
+
+  const trace = {
+    x: categories,
+    y: means,
+    type: 'bar',
+    marker: { color: '#2563eb' },
+    error_y: { type: 'data', array: errors, visible: true, color: '#1e293b' }
+  };
+
+  const layout = {
+    title: { text: `Mean ${numCol} across ${catCol} (±1 SEM)`, font: { size: 14 } },
+    xaxis: { title: catCol },
+    yaxis: { title: `Mean ${numCol}` },
+    margin: { t: 40, b: 40, l: 60, r: 20 }
+  };
+
+  Plotly.newPlot(chartId, [trace], layout, { responsive: true });
+}
+
+function renderClientScatter(xCol, yCol) {
+  const chartId = createChartCard(`Bivariate Scatter & OLS Trendline: ${xCol} vs ${yCol}`, "Regression Fit");
+  if (!chartId || typeof Plotly === 'undefined') return;
+
+  const pts = [];
+  state.cleanedRows.forEach(r => {
+    const x = Number(r[xCol]), y = Number(r[yCol]);
+    if (!isNaN(x) && !isNaN(y)) pts.push({ x, y });
+  });
+
+  const tracePts = {
+    x: pts.map(p => p.x),
+    y: pts.map(p => p.y),
+    mode: 'markers',
+    type: 'scatter',
+    name: 'Observations',
+    marker: { color: '#0ea5e9', size: 7, opacity: 0.7 }
+  };
+
+  // Trendline slope
+  const n = pts.length;
+  const sumX = pts.reduce((a, b) => a + b.x, 0);
+  const sumY = pts.reduce((a, b) => a + b.y, 0);
+  const sumXY = pts.reduce((a, b) => a + b.x * b.y, 0);
+  const sumX2 = pts.reduce((a, b) => a + b.x * b.x, 0);
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+
+  const minX = Math.min(...pts.map(p => p.x));
+  const maxX = Math.max(...pts.map(p => p.x));
+
+  const traceLine = {
+    x: [minX, maxX],
+    y: [slope * minX + intercept, slope * maxX + intercept],
+    mode: 'lines',
+    type: 'scatter',
+    name: `OLS Trend (y = ${slope.toFixed(2)}x + ${intercept.toFixed(2)})`,
+    line: { color: '#dc2626', width: 2.5 }
+  };
+
+  const layout = {
+    title: { text: `${yCol} vs ${xCol}`, font: { size: 14 } },
+    xaxis: { title: xCol },
+    yaxis: { title: yCol },
+    margin: { t: 40, b: 40, l: 60, r: 20 }
+  };
+
+  Plotly.newPlot(chartId, [tracePts, traceLine], layout, { responsive: true });
+}
+
+function renderClientViolin(catCol, numCol) {
+  const chartId = createChartCard(`Violin Density Distribution: ${numCol} by ${catCol}`, "Kernel Density");
+  if (!chartId || typeof Plotly === 'undefined') return;
+
+  const groups = {};
+  state.cleanedRows.forEach(r => {
+    const g = String(r[catCol] || 'Other').trim();
+    const v = Number(r[numCol]);
+    if (!isNaN(v)) {
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(v);
+    }
+  });
+
+  const traces = Object.keys(groups).map(g => ({
+    type: 'violin',
+    y: groups[g],
+    name: g,
+    box: { visible: true },
+    meanline: { visible: true }
+  }));
+
+  const layout = {
+    title: { text: `Violin Density of ${numCol} across ${catCol}`, font: { size: 14 } },
+    yaxis: { title: numCol },
+    xaxis: { title: catCol },
+    margin: { t: 40, b: 40, l: 60, r: 20 }
+  };
+
+  Plotly.newPlot(chartId, traces, layout, { responsive: true });
+}
+
+function renderClientPie(col) {
+  const chartId = createChartCard(`Donut / Proportion Chart of ${col}`, "Categorical Shares");
+  if (!chartId || typeof Plotly === 'undefined') return;
+
+  const counts = {};
+  state.cleanedRows.forEach(r => {
+    const k = String(r[col] || 'Missing').trim();
+    counts[k] = (counts[k] || 0) + 1;
+  });
+
+  const trace = {
+    labels: Object.keys(counts),
+    values: Object.values(counts),
+    type: 'pie',
+    hole: 0.45,
+    marker: { colors: ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'] }
+  };
+
+  const layout = {
+    title: { text: `Category Distribution of ${col}`, font: { size: 14 } },
+    margin: { t: 40, b: 40, l: 40, r: 40 }
+  };
+
+  Plotly.newPlot(chartId, [trace], layout, { responsive: true });
+}
+
+function renderClientLine(xCol, yCol) {
+  const chartId = createChartCard(`Line Trend Series: ${yCol} across ${xCol}`, "Sequential Tracking");
+  if (!chartId || typeof Plotly === 'undefined') return;
+
+  const pts = [];
+  state.cleanedRows.forEach(r => {
+    const x = r[xCol];
+    const y = Number(r[yCol]);
+    if (x !== null && x !== undefined && !isNaN(y)) pts.push({ x, y });
+  });
+
+  const trace = {
+    x: pts.map(p => p.x),
+    y: pts.map(p => p.y),
+    type: 'scatter',
+    mode: 'lines+markers',
+    line: { color: '#2563eb', width: 2 }
+  };
+
+  const layout = {
+    title: { text: `${yCol} across ${xCol}`, font: { size: 14 } },
+    xaxis: { title: xCol },
+    yaxis: { title: yCol },
+    margin: { t: 40, b: 40, l: 60, r: 20 }
+  };
+
+  Plotly.newPlot(chartId, [trace], layout, { responsive: true });
+}
+
+function loadHeatmap() {
+  const containerId = "plot-heatmap-container";
+  const numCols = state.columns.numeric || [];
+  if (numCols.length < 2 || !window.StatisticalEngine || typeof Plotly === 'undefined') return;
+
+  const matData = window.StatisticalEngine.calculateCorrelationMatrix(state.cleanedRows, numCols);
+  const z = [];
+  numCols.forEach(r => {
+    const rowVals = [];
+    numCols.forEach(c => rowVals.push(matData.correlation_matrix[r][c]));
+    z.push(rowVals);
+  });
+
+  const trace = {
+    z: z,
+    x: numCols,
+    y: numCols,
+    type: 'heatmap',
+    colorscale: 'Blues',
+    zmin: -1.0,
+    zmax: 1.0
+  };
+
+  const layout = {
+    title: { text: "Pearson Correlation Matrix", font: { size: 13 } },
+    margin: { t: 40, b: 40, l: 80, r: 40 }
+  };
+
+  Plotly.newPlot(containerId, [trace], layout, { responsive: true });
+}
+
+// ==========================================
+// 1-Click Automated Research Pipeline
+// ==========================================
+function runFullAutomatedPipeline() {
   if (!requireActiveDataset("generate an automatic report")) return;
-  showNotification("Executing End-to-End Automated Research Pipeline...", "info");
+  showNotification("Executing End-to-End Automated Research Pipeline in Browser...", "info");
+
   try {
-    // 1. Ensure cleaned
-    await fetch("/api/eda/clean", { method: "POST", body: new FormData() });
-    
-    // 2. Generate Report with dynamic title grounded in active dataset
-    const repRes = await fetch("/api/report/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: "",
-        researcher_name: "Lead Lab Investigator",
-        professor_template: "Standard Empirical Laboratory Report",
-        selected_tests: state.executedTests
-      })
-    });
-    const reportData = await repRes.json();
-    if (repRes.ok) {
-      state.currentReport = reportData;
-      renderAcademicManuscript(reportData);
-      showNotification("Pipeline complete! Full draft report synthesized.", "success");
-      switchTab("report");
+    // 1. Auto-clean if not already cleaned
+    window.EDAProfiler.cleanData(state.cleanedRows, { drop_duplicates: true });
+
+    // 2. Compute automated tests if none executed yet
+    if (state.executedTests.length === 0 && window.StatisticalEngine) {
+      const recs = window.StatisticalEngine.autoRecommendAnalysis(state.cleanedRows, state.columns, state.objective);
+      recs.slice(0, 3).forEach(r => {
+        let res;
+        if (r.test === "two_sample_test") res = window.StatisticalEngine.twoSampleTest(state.cleanedRows, r.params.continuous_col, r.params.group_col);
+        else if (r.test === "anova_test") res = window.StatisticalEngine.anovaTest(state.cleanedRows, r.params.continuous_col, r.params.group_col);
+        else if (r.test === "correlation_analysis") res = window.StatisticalEngine.correlationAnalysis(state.cleanedRows, r.params.col1, r.params.col2);
+        else if (r.test === "chi_square_test") res = window.StatisticalEngine.chiSquareTest(state.cleanedRows, r.params.var1, r.params.var2);
+        else if (r.test === "linear_regression") res = window.StatisticalEngine.linearRegression(state.cleanedRows, r.params.target_col, r.params.feature_cols);
+        if (res && !res.error) state.executedTests.push(res);
+      });
     }
+
+    // 3. Construct academic manuscript report
+    const reportData = window.ReportGenerator.constructAcademicReport({
+      title: "",
+      researcherName: "Lead Lab Investigator",
+      professorTemplate: "Standard Empirical Research Report",
+      rows: state.cleanedRows,
+      columns: state.columns,
+      profile: state.profile,
+      statisticalResults: state.executedTests,
+      attachedCharts: state.reportCharts,
+      researchObjective: state.objective,
+      filename: state.currentDataset
+    });
+
+    state.currentReport = reportData;
+    renderAcademicManuscript(reportData);
+    showNotification("Pipeline complete! Full draft report synthesized.", "success");
+    switchTab("report");
   } catch (e) {
-    showNotification("Pipeline error: " + e.message, "danger");
+    showNotification("Pipeline execution error: " + e.message, "danger");
   }
 }
 
-// Academic Report & Human Validation Controller
+// ==========================================
+// Tab 5: Academic Report & Human Validation Controller
+// ==========================================
 function renderAcademicManuscript(rep) {
   state.currentReport = rep;
   document.getElementById("rep-title").textContent = rep.title;
@@ -820,7 +1050,7 @@ function renderAcademicManuscript(rep) {
   const customContent = document.getElementById("rep-custom-rendered-content");
 
   if (rep.is_custom_template && rep.rendered_content) {
-    // Show custom template outline view for only this generated report
+    // Show custom template outline view for only this report
     if (standardView) standardView.style.display = "none";
     if (customView) {
       customView.style.display = "block";
@@ -831,12 +1061,10 @@ function renderAcademicManuscript(rep) {
     if (standardView) standardView.style.display = "block";
     if (customView) customView.style.display = "none";
 
-    // Sections
     document.getElementById("rep-abstract-text").value = rep.abstract || "";
     document.getElementById("rep-intro").textContent = rep.introduction || "";
     document.getElementById("rep-methodology").textContent = rep.methodology || "";
 
-    // Results
     const resContainer = document.getElementById("rep-results-container");
     if (resContainer) {
       resContainer.innerHTML = "";
@@ -854,14 +1082,13 @@ function renderAcademicManuscript(rep) {
     document.getElementById("rep-discussion-text").value = rep.discussion || "";
     document.getElementById("rep-limitations").textContent = rep.limitations || "";
     document.getElementById("rep-conclusions-text").value = rep.conclusions || "";
-    
-    // Document Grounding Section
+
     const docGroundingElem = document.getElementById("rep-doc-grounding");
     if (docGroundingElem) {
       docGroundingElem.textContent = rep.document_grounding || "All statistical procedures grounded against APA 7th Edition Reporting Standards.";
     }
   }
-  
+
   document.getElementById("human-notes-input").value = rep.human_notes || "";
 }
 
@@ -962,16 +1189,16 @@ function initValidationListeners() {
     });
   }
 
-  // Quick preset outline buttons for manual builder
+  // Quick preset outline buttons
   const outlineArea = document.getElementById("manual-rep-outline");
   const btnPreStd = document.getElementById("btn-outline-preset-std");
   const btnPreExec = document.getElementById("btn-outline-preset-exec");
   const btnPreClin = document.getElementById("btn-outline-preset-clinical");
 
   if (outlineArea) {
-    if (btnPreStd) {
-      btnPreStd.addEventListener("click", () => {
-        outlineArea.value = `# {{title}}
+    btnPreStd?.addEventListener("click", () => {
+      outlineArea.value = 
+`# {{title}}
 **Principal Investigator:** {{researcher_name}} | **Date:** {{date}} | **Dataset:** \`{{dataset_name}}\`
 
 ---
@@ -1009,13 +1236,12 @@ function initValidationListeners() {
 
 ## 8. Document Grounding & Methodology Compliance
 {{document_grounding}}`;
-        showNotification("Loaded Academic Standard outline into builder.", "info");
-      });
-    }
+      showNotification("Loaded Academic Standard outline into builder.", "info");
+    });
 
-    if (btnPreExec) {
-      btnPreExec.addEventListener("click", () => {
-        outlineArea.value = `# {{title}}
+    btnPreExec?.addEventListener("click", () => {
+      outlineArea.value = 
+`# {{title}}
 **Author:** {{researcher_name}} | **Date:** {{date}}
 
 ---
@@ -1036,13 +1262,12 @@ function initValidationListeners() {
 
 ## 5. Actionable Conclusions & Next Steps
 {{conclusions}}`;
-        showNotification("Loaded Executive Brief outline into builder.", "info");
-      });
-    }
+      showNotification("Loaded Executive Brief outline into builder.", "info");
+    });
 
-    if (btnPreClin) {
-      btnPreClin.addEventListener("click", () => {
-        outlineArea.value = `# {{title}} (Clinical Evaluation)
+    btnPreClin?.addEventListener("click", () => {
+      outlineArea.value = 
+`# {{title}} (Clinical Evaluation)
 **Lead Investigator:** {{researcher_name}} | **Protocol Date:** {{date}} | **Cohort:** \`{{dataset_name}}\` (N = {{row_count}})
 
 ---
@@ -1068,156 +1293,107 @@ function initValidationListeners() {
 ## 5. Safety, Limitations & Conclusions
 {{limitations}}
 {{conclusions}}`;
-        showNotification("Loaded Clinical Cohort outline into builder.", "info");
-      });
-    }
-  }
-
-  // 1. Generate Automatic Report
-  const btnGenAuto = document.getElementById("btn-generate-report-auto");
-  if (btnGenAuto) {
-    btnGenAuto.addEventListener("click", async () => {
-      if (!requireActiveDataset("generate an automatic report")) return;
-      showNotification("Synthesizing dynamic academic report grounded in active dataset...", "info");
-      const repRes = await fetch("/api/report/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: "",
-          researcher_name: "Lead Lab Investigator",
-          professor_template: "Standard Empirical Research Report",
-          selected_tests: state.executedTests,
-          attached_charts: state.reportCharts
-        })
-      });
-      const data = await repRes.json();
-      if (repRes.ok) {
-        renderAcademicManuscript(data);
-        showNotification("Automatic research report synthesized successfully!", "success");
-      } else {
-        showNotification(data.detail || "Report synthesis failed", "danger");
-      }
+      showNotification("Loaded Clinical Cohort outline into builder.", "info");
     });
   }
 
-  // 2. Generate Custom Manual Report with Outline
-  const btnGenManual = document.getElementById("btn-generate-report-manual");
-  if (btnGenManual) {
-    btnGenManual.addEventListener("click", async () => {
-      if (!requireActiveDataset("compile a manual report")) return;
-      const title = document.getElementById("manual-rep-title")?.value.trim() || "Empirical Research Report";
-      const author = document.getElementById("manual-rep-author")?.value.trim() || "Laboratory Researcher";
-      const template = document.getElementById("manual-rep-template")?.value || "Standard Empirical Research Report";
-      const notes = document.getElementById("manual-rep-notes")?.value.trim() || "";
-      const customOutline = document.getElementById("manual-rep-outline")?.value.trim() || "";
-
-      showNotification("Compiling custom manual report with template outline...", "info");
-      const repRes = await fetch("/api/report/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title,
-          researcher_name: author,
-          professor_template: template,
-          custom_template_content: customOutline,
-          selected_tests: state.executedTests,
-          custom_notes: notes,
-          attached_charts: state.reportCharts
-        })
-      });
-      const data = await repRes.json();
-      if (repRes.ok) {
-        renderAcademicManuscript(data);
-        showNotification("Custom manual report compiled with your template outline!", "success");
-      } else {
-        showNotification(data.detail || "Manual report compilation failed", "danger");
-      }
-    });
-  }
-
-  // Legacy button fallback
-  const btnGenLegacy = document.getElementById("btn-generate-report");
-  if (btnGenLegacy) {
-    btnGenLegacy.addEventListener("click", () => {
-      if (btnGenAuto) btnGenAuto.click();
-    });
-  }
-
-  // Human Sign-Off / Status update
-  const btnSaveVal = document.getElementById("btn-save-validation");
-  if (btnSaveVal) {
-    btnSaveVal.addEventListener("click", async () => {
-      const status = document.getElementById("select-validation-status")?.value || "VERIFIED_BY_RESEARCHER";
-      const notes = document.getElementById("human-notes-input")?.value || "";
-      const editedAbs = document.getElementById("rep-abstract-text")?.value;
-      const editedDisc = document.getElementById("rep-discussion-text")?.value;
-      const editedConc = document.getElementById("rep-conclusions-text")?.value;
-
-      showNotification("Saving researcher validation sign-off...", "info");
-      const res = await fetch("/api/report/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          validation_status: status,
-          human_notes: notes,
-          edited_abstract: editedAbs,
-          edited_discussion: editedDisc,
-          edited_conclusions: editedConc
-        })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        state.currentReport = data.report;
-        renderAcademicManuscript(data.report);
-        showNotification(`Human validation confirmed: ${status.replace(/_/g, " ")}`, "success");
-      }
-    });
-  }
-
-  // Save / Export to Local Device Handlers
-  const btnDocx = document.getElementById("btn-export-docx");
-  if (btnDocx) {
-    btnDocx.addEventListener("click", () => {
-      showNotification("Downloading Word document (.docx) to your computer...", "info");
-      window.location.href = "/api/report/export-docx";
-    });
-  }
-
-  const btnMd = document.getElementById("btn-export-markdown");
-  if (btnMd) {
-    btnMd.addEventListener("click", () => {
-      showNotification("Downloading Markdown manuscript (.md) to your computer...", "info");
-      window.location.href = "/api/report/export-markdown";
-    });
-  }
-
-  const btnHtml = document.getElementById("btn-export-html");
-  if (btnHtml) {
-    btnHtml.addEventListener("click", () => {
-      showNotification("Downloading standalone HTML report to your computer...", "info");
-      window.location.href = "/api/report/export-html";
-    });
-  }
-
-  const btnPdf = document.getElementById("btn-export-pdf");
-  if (btnPdf) {
-    btnPdf.addEventListener("click", () => {
-      window.print();
-    });
-  }
-}
-
-// RAG Knowledge Base Controller
-function initMethodologyListeners() {
-  document.getElementById("btn-search-rag").addEventListener("click", async () => {
-    const q = document.getElementById("input-rag-search").value.trim();
-    if (!q) return;
-    const res = await fetch(`/api/rag/query?q=${encodeURIComponent(q)}`);
-    const docs = await res.json();
-    renderRAGResults(docs);
+  // Generate Automatic Report Button in Tab 5
+  document.getElementById("btn-generate-report-auto")?.addEventListener("click", () => {
+    runFullAutomatedPipeline();
   });
 
-  document.getElementById("btn-add-protocol").addEventListener("click", async () => {
+  // Generate Custom Manual Report with Outline
+  document.getElementById("btn-generate-report-manual")?.addEventListener("click", () => {
+    if (!requireActiveDataset("compile a manual report")) return;
+    const title = document.getElementById("manual-rep-title")?.value.trim() || "Empirical Research Report";
+    const author = document.getElementById("manual-rep-author")?.value.trim() || "Laboratory Researcher";
+    const template = document.getElementById("manual-rep-template")?.value || "Standard Empirical Research Report";
+    const notes = document.getElementById("manual-rep-notes")?.value.trim() || "";
+    const customOutline = document.getElementById("manual-rep-outline")?.value.trim() || "";
+
+    showNotification("Compiling custom manual report with template outline...", "info");
+
+    const reportData = window.ReportGenerator.constructAcademicReport({
+      title: title,
+      researcherName: author,
+      professorTemplate: template,
+      customTemplateContent: customOutline,
+      rows: state.cleanedRows,
+      columns: state.columns,
+      profile: state.profile,
+      statisticalResults: state.executedTests,
+      customNotes: notes,
+      attachedCharts: state.reportCharts,
+      researchObjective: state.objective,
+      filename: state.currentDataset
+    });
+
+    renderAcademicManuscript(reportData);
+    showNotification("Custom manual report compiled with your template outline!", "success");
+  });
+
+  // Human Sign-off Save
+  document.getElementById("btn-save-validation")?.addEventListener("click", () => {
+    if (!state.currentReport) {
+      showNotification("No report generated yet.", "warning");
+      return;
+    }
+    const status = document.getElementById("select-validation-status")?.value || "VERIFIED_BY_RESEARCHER";
+    const notes = document.getElementById("human-notes-input")?.value || "";
+    state.currentReport.validation_status = status;
+    state.currentReport.human_notes = notes;
+    renderAcademicManuscript(state.currentReport);
+    showNotification(`Human validation confirmed: ${status.replace(/_/g, " ")}`, "success");
+  });
+
+  // Save / Export to Local Device Handlers
+  document.getElementById("btn-export-docx")?.addEventListener("click", () => {
+    if (!state.currentReport) {
+      showNotification("No report generated yet. Upload dataset and generate report first.", "warning");
+      return;
+    }
+    showNotification("Generating Word document (.doc) in browser...", "info");
+    window.ReportGenerator.exportDocx(state.currentReport);
+  });
+
+  document.getElementById("btn-export-markdown")?.addEventListener("click", () => {
+    if (!state.currentReport) {
+      showNotification("No report generated yet. Upload dataset and generate report first.", "warning");
+      return;
+    }
+    showNotification("Downloading Markdown manuscript (.md)...", "info");
+    window.ReportGenerator.exportMarkdown(state.currentReport);
+  });
+
+  document.getElementById("btn-export-html")?.addEventListener("click", () => {
+    if (!state.currentReport) {
+      showNotification("No report generated yet. Upload dataset and generate report first.", "warning");
+      return;
+    }
+    showNotification("Downloading standalone HTML report...", "info");
+    window.ReportGenerator.exportHTML(state.currentReport);
+  });
+
+  document.getElementById("btn-export-pdf")?.addEventListener("click", () => {
+    window.print();
+  });
+}
+
+// ==========================================
+// Tab 6: RAG & Methodology Library Controller
+// ==========================================
+function initMethodologyListeners() {
+  document.getElementById("btn-search-rag")?.addEventListener("click", () => {
+    const q = document.getElementById("input-rag-search").value.trim();
+    if (!q) {
+      loadRAGDocuments();
+      return;
+    }
+    const results = window.ragEngine.retrieveRelevantContext(q, 10);
+    renderRAGResults(results);
+  });
+
+  document.getElementById("btn-add-protocol")?.addEventListener("click", () => {
     const title = document.getElementById("new-proto-title").value.trim();
     const cat = document.getElementById("new-proto-cat").value.trim() || "Lab Protocol";
     const content = document.getElementById("new-proto-content").value.trim();
@@ -1227,32 +1403,26 @@ function initMethodologyListeners() {
       return;
     }
 
-    const formData = new FormData();
-    formData.append("title", title);
-    formData.append("category", cat);
-    formData.append("content", content);
+    window.ragEngine.addDocument(title, cat, content);
+    showNotification("Methodology guideline indexed into local browser library!", "success");
+    loadRAGDocuments();
 
-    const res = await fetch("/api/rag/upload-guideline", { method: "POST", body: formData });
-    if (res.ok) {
-      showNotification("Methodology guideline indexed into knowledge base!", "success");
-      loadRAGDocuments();
-      document.getElementById("new-proto-title").value = "";
-      document.getElementById("new-proto-content").value = "";
-    }
+    document.getElementById("new-proto-title").value = "";
+    document.getElementById("new-proto-content").value = "";
   });
 }
 
-async function loadRAGDocuments() {
-  try {
-    const res = await fetch("/api/rag/documents");
-    const docs = await res.json();
-    renderRAGResults(docs);
-  } catch (e) {}
+function loadRAGDocuments() {
+  if (!window.ragEngine) return;
+  const docs = window.ragEngine.getAllDocuments();
+  renderRAGResults(docs);
 }
 
 function renderRAGResults(docs) {
   const container = document.getElementById("rag-docs-container");
+  if (!container) return;
   container.innerHTML = "";
+
   if (!docs || docs.length === 0) {
     container.innerHTML = `<p class="text-muted">No documents found.</p>`;
     return;
@@ -1271,6 +1441,141 @@ function renderRAGResults(docs) {
     `;
     container.appendChild(card);
   });
+}
+
+// ==========================================
+// Tab 1: Dataset Q&A & Research Objective Controller
+// ==========================================
+function initQAListeners() {
+  const btnAsk = document.getElementById("btn-ask-dataset");
+  const inputQ = document.getElementById("input-dataset-question");
+  const btnUpdateObj = document.getElementById("btn-update-obj");
+
+  if (btnAsk && inputQ) {
+    btnAsk.addEventListener("click", () => handleAskDataset());
+    inputQ.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") handleAskDataset();
+    });
+  }
+
+  if (btnUpdateObj) {
+    btnUpdateObj.addEventListener("click", () => {
+      if (!requireActiveDataset("save research objective")) return;
+      const obj = document.getElementById("input-objective").value.trim();
+      if (!obj) return;
+      state.objective = obj;
+      showNotification("Research objective updated successfully!", "success");
+    });
+  }
+
+  // Delegate pill clicks
+  const pillsContainer = document.getElementById("qa-suggested-pills");
+  if (pillsContainer) {
+    pillsContainer.addEventListener("click", (e) => {
+      const btn = e.target.closest(".pill-btn");
+      if (btn) {
+        const qText = btn.getAttribute("data-q") || btn.textContent.trim();
+        if (inputQ) {
+          inputQ.value = qText;
+          handleAskDataset();
+        }
+      }
+    });
+  }
+}
+
+function handleAskDataset() {
+  if (!requireActiveDataset("ask questions regarding dataset")) return;
+  const inputQ = document.getElementById("input-dataset-question");
+  if (!inputQ) return;
+  const q = inputQ.value.trim();
+  if (!q) return;
+
+  const respBox = document.getElementById("dataset-qa-response-box");
+  const askedQ = document.getElementById("qa-asked-question");
+  const ansText = document.getElementById("qa-answer-text");
+  const srcBadge = document.getElementById("qa-source-badge");
+
+  respBox.style.display = "block";
+  askedQ.textContent = `Q: "${q}"`;
+  ansText.textContent = "Analyzing active dataset and querying grounded methodology library...";
+  srcBadge.textContent = "Computing...";
+  srcBadge.style.background = "#e2e8f0";
+  srcBadge.style.color = "#475569";
+
+  setTimeout(() => {
+    const data = window.DatasetQA.answerQuestion(
+      q,
+      state.cleanedRows,
+      state.columns,
+      state.profile,
+      state.executedTests,
+      state.objective,
+      state.currentDataset
+    );
+
+    ansText.innerHTML = formatMarkdownAnswer(data.answer);
+    srcBadge.textContent = data.source || "Dataset Computation";
+    if (data.grounded) {
+      srcBadge.style.background = "#dbeafe";
+      srcBadge.style.color = "#1e40af";
+    } else {
+      srcBadge.style.background = "#fee2e2";
+      srcBadge.style.color = "#b91c1c";
+    }
+  }, 100);
+}
+
+function formatMarkdownAnswer(text) {
+  if (!text) return "";
+  let html = escapeHtml(text);
+  // Bold
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  // Italic
+  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code style="background: #e2e8f0; padding: 2px 4px; border-radius: 4px; font-family: monospace;">$1</code>');
+  // Bullet lines
+  html = html.replace(/^- (.*)$/gm, '<li style="margin-left: 1.25rem;">$1</li>');
+  html = html.replace(/^• (.*)$/gm, '<li style="margin-left: 1.25rem;">$1</li>');
+  if (html.includes('<li>')) {
+    html = html.replace(/(<li[\s\S]*?<\/li>)/g, '<ul style="margin: 0.35rem 0 0.35rem 1.25rem; padding-left: 0.5rem;">$1</ul>');
+  }
+  return html.replace(/\n/g, '<br>');
+}
+
+function updateSuggestedQuestions(profile) {
+  const pillsContainer = document.getElementById("qa-suggested-pills");
+  if (!pillsContainer || !profile) return;
+
+  const numCols = profile.numerical_columns || [];
+  const catCols = profile.categorical_columns || [];
+  const pills = [];
+
+  // Summary & Objective
+  pills.push({ label: "📊 Dataset Summary", q: "Summarize this dataset and list key attributes" });
+  pills.push({ label: "🎯 Research Objective", q: "What is the primary research objective of this study?" });
+
+  if (numCols.length > 0) {
+    pills.push({ label: `Mean ${numCols[0]}`, q: `What is the average of ${numCols[0]}?` });
+  }
+  if (numCols.length > 0 && catCols.length > 0) {
+    pills.push({ label: `${numCols[0]} by ${catCols[0]}`, q: `What is the average of ${numCols[0]} across ${catCols[0]}?` });
+  }
+  if (catCols.length > 0) {
+    pills.push({ label: `Categories of ${catCols[0]}`, q: `What are the categories and distribution of ${catCols[0]}?` });
+  }
+  if (numCols.length >= 2) {
+    pills.push({ label: `Correlations`, q: `What are the strongest correlations in this dataset?` });
+  }
+
+  pills.push({ label: "Missing & Outliers", q: "Are there missing values or outliers in this dataset?" });
+  pills.push({ label: "⚡ Recommended Tests", q: "What statistical tests should I run for this dataset?" });
+  pills.push({ label: "APA 7th Standard", q: "What does APA 7th require for reporting statistical results?" });
+
+  pillsContainer.innerHTML = pills.map(p => 
+    `<button class="btn btn-secondary btn-sm pill-btn" data-q="${escapeHtml(p.q)}">${escapeHtml(p.label)}</button>`
+  ).join(" ");
 }
 
 // Helpers & Toasts
@@ -1298,157 +1603,3 @@ function escapeHtml(text) {
   if (typeof text !== "string") return text;
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
-
-// ==========================================
-// Dataset Q&A & Research Objective Controller
-// ==========================================
-function initQAListeners() {
-  const btnAsk = document.getElementById("btn-ask-dataset");
-  const inputQ = document.getElementById("input-dataset-question");
-  const btnUpdateObj = document.getElementById("btn-update-obj");
-
-  if (btnAsk && inputQ) {
-    btnAsk.addEventListener("click", () => handleAskDataset());
-    inputQ.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") handleAskDataset();
-    });
-  }
-
-  if (btnUpdateObj) {
-    btnUpdateObj.addEventListener("click", async () => {
-      if (!requireActiveDataset("save research objective")) return;
-      const obj = document.getElementById("input-objective").value.trim();
-      if (!obj) return;
-      try {
-        const res = await fetch("/api/eda/update-objective", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ objective: obj })
-        });
-        if (res.ok) {
-          state.objective = obj;
-          showNotification("Research objective updated successfully!", "success");
-        }
-      } catch (err) {
-        showNotification("Failed to save objective: " + err.message, "danger");
-      }
-    });
-  }
-
-  // Delegate pill clicks
-  const pillsContainer = document.getElementById("qa-suggested-pills");
-  if (pillsContainer) {
-    pillsContainer.addEventListener("click", (e) => {
-      const btn = e.target.closest(".pill-btn");
-      if (btn) {
-        const qText = btn.getAttribute("data-q") || btn.textContent.trim();
-        if (inputQ) {
-          inputQ.value = qText;
-          handleAskDataset();
-        }
-      }
-    });
-  }
-}
-
-async function handleAskDataset() {
-  if (!requireActiveDataset("ask questions regarding dataset")) return;
-  const inputQ = document.getElementById("input-dataset-question");
-  if (!inputQ) return;
-  const q = inputQ.value.trim();
-  if (!q) return;
-
-  const respBox = document.getElementById("dataset-qa-response-box");
-  const askedQ = document.getElementById("qa-asked-question");
-  const ansText = document.getElementById("qa-answer-text");
-  const srcBadge = document.getElementById("qa-source-badge");
-
-  respBox.style.display = "block";
-  askedQ.textContent = `Q: "${q}"`;
-  ansText.textContent = "Analyzing active dataset and querying grounded methodology library...";
-  srcBadge.textContent = "Computing...";
-  srcBadge.style.background = "#e2e8f0";
-  srcBadge.style.color = "#475569";
-
-  try {
-    const res = await fetch("/api/eda/ask", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: q })
-    });
-    const data = await res.json();
-    if (res.ok) {
-      ansText.innerHTML = formatMarkdownAnswer(data.answer);
-      srcBadge.textContent = data.source || "Dataset Computation";
-      if (data.grounded) {
-        srcBadge.style.background = "#dbeafe";
-        srcBadge.style.color = "#1e40af";
-      } else {
-        srcBadge.style.background = "#fef3c7";
-        srcBadge.style.color = "#92400e";
-      }
-    } else {
-      ansText.textContent = data.detail || "Error querying dataset.";
-      srcBadge.textContent = "Error";
-      srcBadge.style.background = "#fee2e2";
-      srcBadge.style.color = "#991b1b";
-    }
-  } catch (err) {
-    ansText.textContent = "Error communicating with research assistant: " + err.message;
-    srcBadge.textContent = "Failed";
-  }
-}
-
-function formatMarkdownAnswer(txt) {
-  if (!txt) return "";
-  let html = escapeHtml(txt);
-  // bold **text**
-  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-  // italics *text*
-  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-  // code `text`
-  html = html.replace(/`([^`]+)`/g, '<code style="background: #f1f5f9; padding: 2px 5px; border-radius: 4px; font-family: monospace; font-size: 0.85em; color: #0f172a;">$1</code>');
-  // bullet points
-  html = html.replace(/^[•\-\*]\s+(.*)$/gm, '<li style="margin-bottom: 3px;">$1</li>');
-  if (html.includes('<li>')) {
-    html = html.replace(/(<li[\s\S]*?<\/li>)/g, '<ul style="margin: 0.35rem 0 0.35rem 1.25rem; padding-left: 0.5rem;">$1</ul>');
-  }
-  return html.replace(/\n/g, '<br>');
-}
-
-function updateSuggestedQuestions(profile) {
-  const pillsContainer = document.getElementById("qa-suggested-pills");
-  if (!pillsContainer || !profile) return;
-
-  const numCols = profile.numerical_columns || [];
-  const catCols = profile.categorical_columns || [];
-  const pills = [];
-
-  // 1. Overall Summary & Objective
-  pills.push({ label: "📊 Dataset Summary", q: "Summarize this dataset and list key attributes" });
-  pills.push({ label: "🎯 Research Objective", q: "What is the primary research objective of this study?" });
-
-  // 2. Numeric and Group Queries
-  if (numCols.length > 0) {
-    pills.push({ label: `Mean ${numCols[0]}`, q: `What is the average of ${numCols[0]}?` });
-  }
-  if (numCols.length > 0 && catCols.length > 0) {
-    pills.push({ label: `${numCols[0]} by ${catCols[0]}`, q: `What is the average of ${numCols[0]} across ${catCols[0]}?` });
-  }
-  if (catCols.length > 0) {
-    pills.push({ label: `Categories of ${catCols[0]}`, q: `What are the categories and distribution of ${catCols[0]}?` });
-  }
-  if (numCols.length >= 2) {
-    pills.push({ label: `Correlations`, q: `What are the strongest correlations in this dataset?` });
-  }
-
-  // 3. Hygiene & Guidelines
-  pills.push({ label: "Missing & Outliers", q: "Are there missing values or outliers in this dataset?" });
-  pills.push({ label: "⚡ Recommended Tests", q: "What statistical tests should I run for this dataset?" });
-  pills.push({ label: "APA Guidelines", q: "What does APA 7th require for reporting statistical results?" });
-
-  pillsContainer.innerHTML = pills.map(p => 
-    `<button class="btn btn-secondary btn-sm pill-btn" data-q="${escapeHtml(p.q)}">${escapeHtml(p.label)}</button>`
-  ).join(" ");
-}
-

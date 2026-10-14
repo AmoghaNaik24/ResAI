@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ResAI | analysis made easy</title>
+  <meta name="description" content="ResAI - Precision research data analysis and reporting platform. Automated data quality profiling, rigorous hypothesis testing, and academic manuscripts made easy.">
+  
+  <!-- Modern Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Plotly.js for Interactive Visualizations -->
+  <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+
+  <!-- Application Stylesheet (Relative Path for GitHub Pages Compatibility) -->
+  <link rel="stylesheet" href="./static/css/styles.css">
+</head>
+<body>
+
+  <!-- Top Navigation & Branding Header -->
+  <header class="app-header">
+    <div class="brand-wrapper">
+      <div class="brand-logo" id="logo-icon" style="background: linear-gradient(135deg, #2563eb, #7c3aed); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #ffffff;">
+          <path d="M3 3v18h18" />
+          <path d="M18 9l-5 5-4-4-3 3" />
+        </svg>
+      </div>
+      <div>
+        <div style="display: flex; align-items: center;">
+          <span class="brand-title">ResAI <span style="font-weight: 400; color: #2563eb;">Platform</span></span>
+        </div>
+        <div style="font-size: 0.82rem; color: var(--text-muted); font-weight: 500; letter-spacing: 0.01em;">analysis made easy</div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 1rem;">
+      <div class="header-status-pill">
+        <span class="status-dot"></span>
+        <span>Active Dataset: <strong id="header-dataset-name" style="color: var(--secondary);">No dataset loaded (Upload file below)</strong></span>
+      </div>
+      <button class="btn btn-primary" id="btn-run-full-pipeline" title="Run end-to-end data analysis and generate draft report grounded in active dataset">
+        ⚡ Generate Automatic Report
+      </button>
+    </div>
+  </header>
+
+  <!-- Step / Workflow Navigation Tabs -->
+  <nav class="workflow-nav-bar" aria-label="Workflow Steps">
+    <button class="nav-tab-btn active" data-tab="upload" id="tab-btn-upload">
+      <span class="tab-badge">1</span> Ingest & Dataset Q&A
+    </button>
+    <button class="nav-tab-btn" data-tab="eda" id="tab-btn-eda">
+      <span class="tab-badge">2</span> Data Health & Profiling
+    </button>
+    <button class="nav-tab-btn" data-tab="analysis" id="tab-btn-analysis">
+      <span class="tab-badge">3</span> Hypothesis Testing & Stats
+    </button>
+    <button class="nav-tab-btn" data-tab="visuals" id="tab-btn-visuals">
+      <span class="tab-badge">4</span> Publication Visualizations
+    </button>
+    <button class="nav-tab-btn" data-tab="report" id="tab-btn-report">
+      <span class="tab-badge">5</span> Academic Report & Human Validation
+    </button>
+    <button class="nav-tab-btn" data-tab="rag" id="tab-btn-rag">
+      <span class="tab-badge">6</span> RAG & Methodology Library
+    </button>
+  </nav>
+
+  <!-- Main Work Area -->
+  <main class="app-main">
+
+    <!-- ==========================================
+         TAB 1: INGEST & OBJECTIVES
+         ========================================== -->
+    <section class="tab-pane active" id="tab-upload">
+      <div class="grid-2">
+        <!-- Dataset Ingestion Card -->
+        <div class="card">
+          <div class="card-header-flex">
+            <div>
+              <h2 class="card-title">1. Dataset Ingestion</h2>
+              <div class="card-subtitle">Upload your laboratory qualitative or quantitative dataset (.CSV or .XLSX)</div>
+            </div>
+            <button class="btn btn-primary btn-sm btn-trigger-auto-report" title="Automatically analyze data and generate report">
+              ⚡ Generate Automatic Report
+            </button>
+          </div>
+
+          <div class="drop-zone" id="drop-zone">
+            <div class="drop-icon">📂</div>
+            <div style="font-weight: 600; font-size: 1rem; color: var(--secondary);">Drop experimental data file here</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">or click to browse from your workstation</div>
+            <input type="file" id="file-input" accept=".csv, .xlsx, .xls" style="display: none;">
+          </div>
+
+          <!-- File Uploaded Confirmation Status Banner -->
+          <div id="upload-status-area" style="display: none; margin-top: 1rem;"></div>
+        </div>
+
+        <!-- Natural Language Dataset Q&A Tool Card -->
+        <div class="card">
+          <div class="card-header-flex">
+            <div>
+              <h2 class="card-title">2. Natural Language Dataset Q&A Tool</h2>
+              <div class="card-subtitle">Ask questions directly grounded in the active dataset. Strictly limited knowledge outside data scope.</div>
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <span class="badge badge-success" id="qa-mode-badge">Document Grounded</span>
+              <button class="btn btn-primary btn-sm btn-trigger-auto-report" title="Synthesize dynamic report based on active file">
+                ⚡ Generate Automatic Report
+              </button>
+            </div>
+          </div>
+
+          <!-- Dataset Question & Answer Interactive Tool -->
+          <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 1.1rem; margin-top: 0.25rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem;">
+              <div style="font-weight: 700; font-size: 0.95rem; color: #1e3a8a; display: flex; align-items: center; gap: 0.4rem;">
+                <span>💬 Question & Answer Assistant</span>
+              </div>
+              <span style="font-size: 0.75rem; color: #64748b; font-weight: 500;">Zero-Hallucination &bull; Grounded in DataFrame</span>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+              <input type="text" id="input-dataset-question" class="form-input" style="flex: 1;" placeholder="Ask anything about the uploaded dataset (e.g., 'Summarize dataset', 'What is the average of X?', 'Are there outliers?', 'Compare Y across groups')...">
+              <button class="btn btn-primary" id="btn-ask-dataset" style="white-space: nowrap; display: flex; align-items: center; gap: 0.35rem;">
+                <span>🔍 Ask Dataset</span>
+              </button>
+            </div>
+
+            <!-- Suggested Question Pills -->
+            <div style="font-size: 0.78rem; color: #64748b; margin-bottom: 0.4rem; font-weight: 600;">Suggested inquiries for active dataset (click to ask):</div>
+            <div id="qa-suggested-pills" style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.75rem;">
+              <button class="btn btn-secondary btn-sm pill-btn" data-q="Summarize this dataset and list key attributes">📊 Dataset Summary</button>
+              <button class="btn btn-secondary btn-sm pill-btn" data-q="What is the primary research objective of this study?">🎯 Research Objective</button>
+              <button class="btn btn-secondary btn-sm pill-btn" data-q="Are there missing values or outliers in this dataset?">🔍 Missing & Outliers</button>
+              <button class="btn btn-secondary btn-sm pill-btn" data-q="What statistical tests are recommended for this dataset?">⚡ Recommended Tests</button>
+              <button class="btn btn-secondary btn-sm pill-btn" data-q="What does APA 7th require for reporting statistical results?">📐 APA 7th Standard</button>
+            </div>
+
+            <!-- Q&A Response Box -->
+            <div id="dataset-qa-response-box" style="display: none; background: #ffffff; border: 1.5px solid #94a3b8; border-radius: 6px; padding: 0.95rem; margin-top: 0.6rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.45rem; margin-bottom: 0.6rem;">
+                <span style="font-weight: 600; font-size: 0.85rem; color: #334155;" id="qa-asked-question"></span>
+                <span class="badge" id="qa-source-badge" style="font-size: 0.72rem; background: #dbeafe; color: #1e40af;"></span>
+              </div>
+              <div id="qa-answer-text" style="font-size: 0.88rem; color: #1e293b; line-height: 1.6; white-space: pre-wrap;"></div>
+            </div>
+          </div>
+
+          <!-- Research Objective Formulation (Compact Grounding Context) -->
+          <div style="margin-top: 1rem; border-top: 1px solid #e2e8f0; padding-top: 0.85rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+              <label class="form-label" for="input-objective" style="margin-bottom: 0; font-size: 0.82rem; color: #475569;">
+                <strong>Dataset Research Objective & Inquiries:</strong> <span style="font-weight: 400; color: #64748b;">(Auto-derived from file details; editable)</span>
+              </label>
+              <button class="btn btn-secondary btn-sm" id="btn-update-obj" style="padding: 2px 8px; font-size: 0.75rem;">💾 Save Objective</button>
+            </div>
+            <textarea id="input-objective" class="form-textarea" rows="2" style="font-size: 0.85rem;" placeholder="Automatically synthesized upon dataset upload, or enter your custom research inquiry..."></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 2: DATA HEALTH & PROFILING
+         ========================================== -->
+    <section class="tab-pane" id="tab-eda">
+      <!-- Health Metrics Overview -->
+      <div class="grid-4" style="margin-bottom: 1.5rem;">
+        <div class="stat-box">
+          <div class="stat-value" id="stat-health-score">98.5%</div>
+          <div class="stat-label">Data Health Index</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-total-rows">120</div>
+          <div class="stat-label">Total Observations (N)</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-total-cols">8</div>
+          <div class="stat-label">Variables / Features</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-missing-rate">0.8%</div>
+          <div class="stat-label">Missing Cell Rate</div>
+        </div>
+      </div>
+
+      <!-- Hygiene Notices & 1-Click Clean -->
+      <div class="card">
+        <div class="card-header-flex">
+          <div>
+            <h2 class="card-title">Data Quality & Preprocessing Assessment</h2>
+            <div class="card-subtitle">Automated hygiene checks: missingness patterns, severe outliers, skewness</div>
+          </div>
+          <button class="btn btn-success btn-sm" id="btn-clean-data">
+            ✨ Auto Impute & Clean Dataset
+          </button>
+        </div>
+        <div id="eda-issues-container"></div>
+      </div>
+
+      <!-- Feature Audit Table -->
+      <div class="card">
+        <div class="card-header-flex">
+          <div>
+            <h2 class="card-title">Variable Profiling Audit</h2>
+            <div class="card-subtitle">Data type inference, uniqueness ratio, skewness, and outlier counts</div>
+          </div>
+        </div>
+        <div class="table-container">
+          <table class="data-table" id="eda-columns-table">
+            <thead>
+              <tr>
+                <th>Variable Name</th>
+                <th>Inferred Type</th>
+                <th>Missing Values</th>
+                <th>Unique Count</th>
+                <th>Skewness</th>
+                <th>IQR Outliers</th>
+                <th>Hygiene Status</th>
+              </tr>
+            </thead>
+            <tbody id="eda-columns-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Raw Sample Preview -->
+      <div class="card">
+        <div class="card-header-flex">
+          <div>
+            <h2 class="card-title">Empirical Dataset Preview (First 10 Observations)</h2>
+            <div class="card-subtitle">Verifiable raw records loaded in laboratory memory</div>
+          </div>
+        </div>
+        <div class="table-container">
+          <table class="data-table" id="preview-table">
+            <thead id="preview-thead"></thead>
+            <tbody id="preview-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 3: STATISTICAL ANALYSIS & TESTING
+         ========================================== -->
+    <section class="tab-pane" id="tab-analysis">
+      <!-- AI Recommended Tests -->
+      <div class="card" style="border: 2px solid #bfdbfe;">
+        <div class="card-header-flex">
+          <div>
+            <h2 class="card-title" style="color: #1e40af;">🤖 AI Recommended Statistical Procedures</h2>
+            <div class="card-subtitle">Heuristically mapped to your data distributions, sample size, and research objectives</div>
+          </div>
+        </div>
+        <div id="recommendations-list"></div>
+      </div>
+
+      <!-- Descriptive Statistics Table -->
+      <div class="card">
+        <div class="card-header-flex">
+          <div>
+            <h2 class="card-title">Descriptive Statistics (Parametric & Non-Parametric)</h2>
+            <div class="card-subtitle">Mean, Standard Deviation, 95% CI, Median, Interquartile Range, Normality p-values</div>
+          </div>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Variable</th>
+                <th>Mean ± SD</th>
+                <th>95% Confidence Interval</th>
+                <th>Median (IQR)</th>
+                <th>Range (Min – Max)</th>
+                <th>Skewness</th>
+                <th>Normality (Shapiro-Wilk)</th>
+              </tr>
+            </thead>
+            <tbody id="summary-stats-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Manual Test Builders Grid -->
+      <div class="grid-2">
+        <!-- Two-Sample Test Card -->
+        <div class="card">
+          <div class="card-header-flex">
+            <div>
+              <h3 class="card-title" style="font-size: 1.05rem;">Two-Sample Comparison (t-test / Mann-Whitney)</h3>
+              <div class="card-subtitle">Compare continuous measure between 2 groups (e.g. Treatment vs Control)</div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Continuous Metric (Y)</label>
+            <select class="form-select" id="ts-continuous"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Binary Group Variable (X)</label>
+            <select class="form-select" id="ts-group"></select>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-calc-two-sample">Calculate Comparison</button>
+        </div>
+
+        <!-- ANOVA Card -->
+        <div class="card">
+          <div class="card-header-flex">
+            <div>
+              <h3 class="card-title" style="font-size: 1.05rem;">One-Way ANOVA & Post-hoc Tukey HSD</h3>
+              <div class="card-subtitle">Compare continuous metric across 3+ groups (e.g. Placebo vs Drug A vs Drug B)</div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Continuous Metric (Y)</label>
+            <select class="form-select" id="anova-continuous"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Categorical Factor (X)</label>
+            <select class="form-select" id="anova-group"></select>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-calc-anova">Calculate ANOVA & Tukey</button>
+        </div>
+
+        <!-- Linear Regression Card -->
+        <div class="card">
+          <div class="card-header-flex">
+            <div>
+              <h3 class="card-title" style="font-size: 1.05rem;">OLS Multiple Linear Regression</h3>
+              <div class="card-subtitle">Model relationship of predictors on target outcome with R², F-test, and p-values</div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Target Dependent Variable (Y)</label>
+            <select class="form-select" id="reg-target"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Independent Predictors (X)</label>
+            <div id="reg-predictors-container" style="max-height: 80px; overflow-y: auto; padding: 4px; border: 1px solid #e2e8f0; border-radius: 6px;"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-calc-reg">Fit OLS Regression</button>
+        </div>
+
+        <!-- Correlation & Chi-Square Card -->
+        <div class="card">
+          <div class="card-header-flex">
+            <div>
+              <h3 class="card-title" style="font-size: 1.05rem;">Correlation & Chi-Square Association</h3>
+              <div class="card-subtitle">Pairwise Pearson/Spearman matrices or categorical independence tests</div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Correlation Method</label>
+            <select class="form-select" id="corr-method">
+              <option value="pearson">Pearson Linear Correlation</option>
+              <option value="spearman">Spearman Rank Correlation (Non-parametric)</option>
+            </select>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btn-calc-correlation" style="margin-bottom: 1rem;">Compute Correlation Matrix</button>
+
+          <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 0.75rem 0;">
+          <div style="font-size: 0.8rem; font-weight: 600; color: #475569; margin-bottom: 0.4rem;">Chi-Square Contingency Test:</div>
+          <div class="grid-2" style="gap: 0.5rem; margin-bottom: 0.5rem;">
+            <select class="form-select" id="chi-var1"></select>
+            <select class="form-select" id="chi-var2"></select>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btn-calc-chi">Test Categorical Independence</button>
+        </div>
+      </div>
+
+      <!-- Execution Log & Results Display -->
+      <div style="margin-top: 1.5rem;">
+        <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: var(--secondary); margin-bottom: 0.75rem;">
+          Computed Statistical Findings (APA Verified)
+        </h3>
+        <div id="test-results-log"></div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 4: PUBLICATION VISUALIZATIONS
+         ========================================== -->
+    <section class="tab-pane" id="tab-visuals">
+      <!-- Correlation Heatmap -->
+      <div class="card">
+        <div class="card-header-flex">
+          <div>
+            <h2 class="card-title">Bivariate Correlation Heatmap</h2>
+            <div class="card-subtitle">Interactive matrix with Pearson coefficients</div>
+          </div>
+        </div>
+        <div id="plot-heatmap-container" style="min-height: 420px;"></div>
+      </div>
+
+      <!-- Interactive Custom Visualizer Builder -->
+      <div class="card">
+        <div class="card-header-flex">
+          <div>
+            <h2 class="card-title">Publication Chart Studio</h2>
+            <div class="card-subtitle">Generate publication-grade bar graphs with error bars, pie/donut charts, box/violin distributions, and regression trendlines</div>
+          </div>
+        </div>
+
+        <div class="grid-3" style="margin-bottom: 1.25rem;">
+          <!-- 1. Research Bar Chart -->
+          <div class="stat-box" style="text-align: left;">
+            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">📊 Bar Chart (Means ± SEM / Counts)</div>
+            <label style="font-size: 0.75rem; color: var(--text-muted);">Category / X-Axis:</label>
+            <select class="form-select" id="vis-bar-cat" style="margin-bottom: 0.4rem;"></select>
+            <label style="font-size: 0.75rem; color: var(--text-muted);">Metric / Y-Axis (Optional for Means):</label>
+            <select class="form-select" id="vis-bar-num" style="margin-bottom: 0.4rem;"></select>
+            <label style="font-size: 0.75rem; color: var(--text-muted);">Subgroup / Cluster:</label>
+            <select class="form-select" id="vis-bar-sub" style="margin-bottom: 0.5rem;"></select>
+            <button class="btn btn-secondary btn-sm" id="btn-render-bar" style="width: 100%;">Plot Bar Chart</button>
+          </div>
+
+          <!-- 2. Pie & Donut Chart -->
+          <div class="stat-box" style="text-align: left;">
+            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">🍩 Pie & Donut (Proportions)</div>
+            <label style="font-size: 0.75rem; color: var(--text-muted);">Categorical Variable:</label>
+            <select class="form-select" id="vis-pie-cat" style="margin-bottom: 0.4rem;"></select>
+            <label style="font-size: 0.75rem; color: var(--text-muted);">Style:</label>
+            <select class="form-select" id="vis-pie-style" style="margin-bottom: 0.5rem;">
+              <option value="donut">Donut Chart (Modern)</option>
+              <option value="pie">Full Pie Chart</option>
+            </select>
+            <div style="height: 1.6rem;"></div>
+            <button class="btn btn-secondary btn-sm" id="btn-render-pie" style="width: 100%;">Plot Pie/Donut Chart</button>
+          </div>
+
+          <!-- 3. Box & Violin -->
+          <div class="stat-box" style="text-align: left;">
+            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">🎻 Box & Violin by Group</div>
+            <label style="font-size: 0.75rem; color: var(--text-muted);">Continuous Variable:</label>
+            <select class="form-select" id="vis-box-cont" style="margin-bottom: 0.4rem;"></select>
+            <label style="font-size: 0.75rem; color: var(--text-muted);">Grouping Factor:</label>
+            <select class="form-select" id="vis-box-grp" style="margin-bottom: 0.5rem;"></select>
+            <div style="height: 1.6rem;"></div>
+            <button class="btn btn-secondary btn-sm" id="btn-render-box" style="width: 100%;">Plot Group Variance</button>
+          </div>
+
+          <!-- 4. Scatter & Regression -->
+          <div class="stat-box" style="text-align: left;">
+            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">📈 Scatter & OLS Trendline</div>
+            <label style="font-size: 0.75rem; color: var(--text-muted);">X-Axis Variable:</label>
+            <select class="form-select" id="vis-scat-x" style="margin-bottom: 0.4rem;"></select>
+            <label style="font-size: 0.75rem; color: var(--text-muted);">Y-Axis Variable:</label>
+            <select class="form-select" id="vis-scat-y" style="margin-bottom: 0.5rem;"></select>
+            <button class="btn btn-secondary btn-sm" id="btn-render-scatter" style="width: 100%;">Plot OLS Fit</button>
+          </div>
+
+          <!-- 5. Distribution -->
+          <div class="stat-box" style="text-align: left;">
+            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">📉 Distribution & Histogram</div>
+            <label style="font-size: 0.75rem; color: var(--text-muted);">Continuous Column:</label>
+            <select class="form-select" id="vis-dist-col" style="margin-bottom: 0.4rem;"></select>
+            <label style="font-size: 0.75rem; color: var(--text-muted);">Group By (Optional):</label>
+            <select class="form-select" id="vis-dist-group" style="margin-bottom: 0.5rem;"></select>
+            <button class="btn btn-secondary btn-sm" id="btn-render-dist" style="width: 100%;">Plot Distribution</button>
+          </div>
+
+          <!-- 6. Longitudinal / Trendline -->
+          <div class="stat-box" style="text-align: left;">
+            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">📉 Experimental Trajectory</div>
+            <label style="font-size: 0.75rem; color: var(--text-muted);">X-Axis (Ordered/Time):</label>
+            <select class="form-select" id="vis-line-x" style="margin-bottom: 0.4rem;"></select>
+            <label style="font-size: 0.75rem; color: var(--text-muted);">Y-Axis Variable:</label>
+            <select class="form-select" id="vis-line-y" style="margin-bottom: 0.5rem;"></select>
+            <button class="btn btn-secondary btn-sm" id="btn-render-line" style="width: 100%;">Plot Trendline</button>
+          </div>
+        </div>
+
+        <div id="plot-custom-container" style="min-height: 440px;"></div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 5: ACADEMIC REPORT & HUMAN VALIDATION
+         ========================================== -->
+    <section class="tab-pane" id="tab-report">
+      <!-- Human-in-the-Loop Validation Control Bar -->
+      <div class="validation-banner no-print">
+        <div>
+          <div style="font-weight: 700; color: #065f46; font-size: 1rem;">
+            🛡️ Human-in-the-Loop Research Validation Mode
+          </div>
+          <div style="font-size: 0.85rem; color: #166534; margin-top: 2px;">
+            Cross-check statistical statements, edit draft interpretations, and sign off on laboratory publication readiness.
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <select class="form-select" id="select-validation-status" style="width: auto; font-weight: 600;">
+            <option value="DRAFT_PENDING_REVIEW">Draft (Pending Review)</option>
+            <option value="VERIFIED_BY_RESEARCHER" selected>Verified by Researcher</option>
+            <option value="APPROVED_FOR_PUBLICATION">Approved for Publication</option>
+          </select>
+          <button class="btn btn-success btn-sm" id="btn-save-validation">Confirm Sign-Off</button>
+        </div>
+      </div>
+
+      <!-- Academic Report Generation Studio (Automatic vs Manual) -->
+      <div class="card no-print" style="margin-bottom: 1.5rem;">
+        <div class="card-header-flex">
+          <div>
+            <h2 class="card-title">Academic Manuscript Studio</h2>
+            <div class="card-subtitle">Choose Automatic Generation with Predefined Template or Customize Manually</div>
+          </div>
+          <!-- Mode Toggle Tabs -->
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-sm btn-primary" id="btn-mode-auto">⚡ Automatic Template</button>
+            <button class="btn btn-sm btn-secondary" id="btn-mode-manual">🛠️ Manual Custom Builder</button>
+          </div>
+        </div>
+
+        <!-- Automatic Report Panel -->
+        <div id="panel-report-auto" style="padding-top: 0.75rem;">
+          <p style="font-size: 0.9rem; color: #475569; margin-bottom: 1rem; line-height: 1.5;">
+            Automatically synthesize an empirical academic manuscript using the <strong>Standard Predefined Research Template</strong>. This end-to-end mode incorporates your stated research objective, data health profiling, all computed hypothesis tests, and attached charts.
+          </p>
+          <button class="btn btn-primary" id="btn-generate-report-auto">
+            ⚡ Generate Automatic Report
+          </button>
+        </div>
+
+        <!-- Manual Custom Report Builder Panel -->
+        <div id="panel-report-manual" style="display: none; padding-top: 0.75rem;">
+          <div class="grid-2" style="margin-bottom: 0.75rem;">
+            <div class="form-group">
+              <label class="form-label">Manuscript Title</label>
+              <input type="text" class="form-input" id="manual-rep-title" value="Empirical Investigation and Hypothesis Validation Report">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Lead Researcher / Author</label>
+              <input type="text" class="form-input" id="manual-rep-author" value="Laboratory Research Fellow">
+            </div>
+          </div>
+          <div class="grid-2" style="margin-bottom: 0.75rem;">
+            <div class="form-group">
+              <label class="form-label">Base Style Preset</label>
+              <select class="form-select" id="manual-rep-template">
+                <option value="Standard Empirical Research Report">Standard Empirical Research Report</option>
+                <option value="Clinical Trial Phase II Protocol">Clinical Trial Phase II Protocol</option>
+                <option value="Behavioral & Social Science Inquiry">Behavioral & Social Science Inquiry</option>
+                <option value="Chemical Engineering Kinetics">Chemical Engineering Kinetics</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Custom Hypotheses / Lab Context</label>
+              <input type="text" class="form-input" id="manual-rep-notes" placeholder="Optional notes, citations, or qualitative conditions">
+            </div>
+          </div>
+
+          <!-- Custom Template Outline Builder -->
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; gap: 0.5rem;">
+              <label class="form-label" style="margin-bottom: 0; font-weight: 700; color: #1e3a8a;">
+                📋 Custom Template Outline (Reflected for This Report Only)
+              </label>
+              <div style="display: flex; gap: 0.4rem; font-size: 0.75rem;">
+                <span style="color: #64748b; align-self: center;">Quick Outlines:</span>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-outline-preset-std" style="padding: 2px 8px; font-size: 0.75rem;">Academic Standard</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-outline-preset-exec" style="padding: 2px 8px; font-size: 0.75rem;">Executive Brief</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-outline-preset-clinical" style="padding: 2px 8px; font-size: 0.75rem;">Clinical Cohort</button>
+              </div>
+            </div>
+            <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem;">
+              Customize the section headings and structure below. You can provide section titles (e.g., <em>1. Executive Summary</em>, <em>2. Data Profiling</em>, <em>3. Statistical Findings</em>) or markdown templates with placeholders (<code>{{abstract}}</code>, <code>{{descriptive_statistics_table}}</code>, <code>{{hypothesis_testing_results}}</code>, <code>{{discussion}}</code>, <code>{{conclusions}}</code>). This outline applies only to this compilation.
+            </div>
+            <textarea class="form-textarea" id="manual-rep-outline" rows="8" style="font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.5;" placeholder="# {{title}}
+## Abstract
+{{abstract}}
+
+## 1. Introduction & Research Problem
+{{introduction}}
+
+## 2. Experimental Data Hygiene & Summary Statistics
+{{methodology}}
+{{descriptive_statistics_table}}
+
+## 3. Empirical Hypothesis Testing & APA Results
+{{hypothesis_testing_results}}
+
+## 4. Analytical Discussion
+{{discussion}}
+
+## 5. Strategic Conclusions & Recommendations
+{{conclusions}}"></textarea>
+          </div>
+
+          <button class="btn btn-primary" id="btn-generate-report-manual">
+            🛠️ Compile Custom Manual Report
+          </button>
+        </div>
+      </div>
+
+      <!-- Save Report to Local Device Card -->
+      <div class="card no-print" style="margin-bottom: 1.5rem; background: #f8fafc; border: 1.5px dashed #cbd5e1;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <div style="font-weight: 700; color: #1e3a8a; font-size: 1.05rem;">💾 Save Report to Local Device</div>
+            <div style="font-size: 0.82rem; color: #64748b;">Download and save your verified manuscript in your preferred document format:</div>
+          </div>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="btn btn-secondary btn-sm" id="btn-export-docx" title="Download formatted Word document">
+              📄 Download Word (.docx)
+            </button>
+            <button class="btn btn-secondary btn-sm" id="btn-export-markdown" title="Download raw Markdown text">
+              📝 Download Markdown (.md)
+            </button>
+            <button class="btn btn-secondary btn-sm" id="btn-export-html" title="Download standalone HTML document">
+              🌐 Download HTML (.html)
+            </button>
+            <button class="btn btn-secondary btn-sm" id="btn-export-pdf" title="Print or save as PDF">
+              🖨️ Print / Save as PDF
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Academic Manuscript Paper Preview -->
+      <article class="academic-manuscript" id="manuscript-paper">
+        <h1 id="rep-title">No Academic Report Generated Yet</h1>
+        <div class="manuscript-meta" id="rep-meta">
+          Upload a dataset in Tab 1 and click '⚡ Generate Automatic Report' to synthesize your publication-grade manuscript.
+        </div>
+
+        <div style="text-align: center; margin-bottom: 1.5rem;" id="rep-status-badge-container">
+          <span class="badge badge-success" id="rep-status-badge">DRAFT PENDING REVIEW</span>
+        </div>
+
+        <!-- Standard Predefined Template View -->
+        <div id="manuscript-standard-view">
+          <h2>Abstract</h2>
+          <textarea id="rep-abstract-text" class="form-textarea" style="width: 100%; font-family: 'Times New Roman', serif; font-size: 1.05rem; line-height: 1.8;"></textarea>
+
+          <h2>1. Introduction & Research Inquiries</h2>
+          <p id="rep-intro"></p>
+
+          <h2>2. Data Quality & Preprocessing Methodology</h2>
+          <p id="rep-methodology"></p>
+
+          <h2>3. Statistical Analysis & Hypothesis Testing</h2>
+          <div id="rep-results-container"></div>
+
+          <h2>4. Discussion & Scientific Interpretation</h2>
+          <textarea id="rep-discussion-text" class="form-textarea" style="width: 100%; font-family: 'Times New Roman', serif; font-size: 1.05rem; line-height: 1.8;"></textarea>
+
+          <h2>5. Limitations & Threats to Validity</h2>
+          <p id="rep-limitations" style="white-space: pre-line;"></p>
+
+          <h2>6. Conclusion & Recommendations</h2>
+          <textarea id="rep-conclusions-text" class="form-textarea" style="width: 100%; font-family: 'Times New Roman', serif; font-size: 1.05rem; line-height: 1.8;"></textarea>
+
+          <h2>7. Document Grounding & Methodology Compliance (RAG Library)</h2>
+          <div id="rep-doc-grounding" style="white-space: pre-line; background: #f8fafc; border-left: 3px solid #2563eb; padding: 0.85rem 1.1rem; margin-bottom: 1.5rem; font-family: 'Times New Roman', serif; font-size: 1rem; line-height: 1.6; border-radius: 0 6px 6px 0;"></div>
+        </div>
+
+        <!-- Custom Outline Rendered View (Active for Custom Manual Builder Reports Only) -->
+        <div id="manuscript-custom-outline-view" style="display: none; padding-top: 0.5rem;">
+          <div id="rep-custom-rendered-content" style="font-family: 'Times New Roman', serif; font-size: 1.05rem; line-height: 1.8; color: #1e293b;"></div>
+        </div>
+
+        <h2>Researcher Review Notes & Sign-Off</h2>
+        <div class="no-print" style="margin-bottom: 0.5rem; font-size: 0.85rem; color: #64748b;">
+          Enter any peer remarks, professor feedback, or specific experimental caveats:
+        </div>
+        <textarea id="human-notes-input" class="form-textarea" placeholder="e.g., Verified against experimental notebook. Significance confirmed at p < .001."></textarea>
+      </article>
+    </section>
+
+    <!-- ==========================================
+         TAB 6: RAG & METHODOLOGY LIBRARY
+         ========================================== -->
+    <section class="tab-pane" id="tab-rag">
+      <div class="grid-2">
+        <!-- Indexed Knowledge Base -->
+        <div class="card">
+          <div class="card-header-flex">
+            <div>
+              <h2 class="card-title">Indexed Lab Protocols & Guidelines (RAG)</h2>
+              <div class="card-subtitle">Methodology rules retrieved to ground AI report generation</div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+            <input type="text" id="input-rag-search" class="form-input" placeholder="Search guidelines (e.g. APA t-test, Cohen's d)...">
+            <button class="btn btn-secondary btn-sm" id="btn-search-rag">Search</button>
+          </div>
+
+          <div id="rag-docs-container"></div>
+        </div>
+
+        <!-- Add Custom Protocol / Professor Template -->
+        <div class="card">
+          <div class="card-header-flex">
+            <div>
+              <h2 class="card-title">Add Laboratory Protocol or Professor's Template</h2>
+              <div class="card-subtitle">Teach the AI your specific lab reporting conventions</div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="new-proto-title">Document / Guideline Title</label>
+            <input type="text" id="new-proto-title" class="form-input" placeholder="e.g., Professor Miller's Clinical Reporting Guidelines">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="new-proto-cat">Category</label>
+            <input type="text" id="new-proto-cat" class="form-input" placeholder="e.g., Lab Template, Clinical, Chemistry">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="new-proto-content">Protocol Directives & Reporting Rules</label>
+            <textarea id="new-proto-content" class="form-textarea" rows="6" placeholder="Paste specific report sections, required headings, or statistical thresholds..."></textarea>
+          </div>
+
+          <button class="btn btn-primary btn-sm" id="btn-add-protocol">Index into Knowledge Base</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- In-browser CSV and Excel vendor parsers -->
+  <script src="./static/js/vendor/papaparse.min.js"></script>
+  <script src="./static/js/vendor/xlsx.full.min.js"></script>
+  
+  <!-- ResAI Client-Side In-Browser Scientific Engines -->
+  <script src="./static/js/resai-stats.js"></script>
+  <script src="./static/js/resai-eda.js"></script>
+  <script src="./static/js/resai-rag.js"></script>
+  <script src="./static/js/resai-qa.js"></script>
+  <script src="./static/js/resai-report.js"></script>
+
+  <!-- Front-End Application Logic -->
+  <script src="./static/js/app.js"></script>
+</body>
+</html>

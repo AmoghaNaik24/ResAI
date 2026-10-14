@@ -14,8 +14,8 @@
   <!-- Plotly.js for Interactive Visualizations -->
   <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
 
-  <!-- Application Stylesheet -->
-  <link rel="stylesheet" href="/static/css/styles.css">
+  <!-- Application Stylesheet (Relative Path for GitHub Pages Compatibility) -->
+  <link rel="stylesheet" href="./static/css/styles.css">
 </head>
 <body>
 
@@ -726,7 +726,18 @@
 
   </main>
 
+  <!-- In-browser CSV and Excel vendor parsers -->
+  <script src="./static/js/vendor/papaparse.min.js"></script>
+  <script src="./static/js/vendor/xlsx.full.min.js"></script>
+  
+  <!-- ResAI Client-Side In-Browser Scientific Engines -->
+  <script src="./static/js/resai-stats.js"></script>
+  <script src="./static/js/resai-eda.js"></script>
+  <script src="./static/js/resai-rag.js"></script>
+  <script src="./static/js/resai-qa.js"></script>
+  <script src="./static/js/resai-report.js"></script>
+
   <!-- Front-End Application Logic -->
-  <script src="/static/js/app.js"></script>
+  <script src="./static/js/app.js"></script>
 </body>
 </html>
