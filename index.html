@@ -15,7 +15,7 @@
   <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
 
   <!-- Application Stylesheet (Relative Path for GitHub Pages Compatibility) -->
-  <link rel="stylesheet" href="./static/css/styles.css">
+  <link rel="stylesheet" href="./static/css/styles.css?v=2.0">
 </head>
 <body>
 
@@ -42,7 +42,8 @@
         <span>Active Dataset: <strong id="header-dataset-name" style="color: var(--secondary);">No dataset loaded (Upload file below)</strong></span>
       </div>
       <button class="btn btn-primary" id="btn-run-full-pipeline" title="Run end-to-end data analysis and generate draft report grounded in active dataset">
-        ⚡ Generate Automatic Report
+        <svg class="ui-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Generate Full Report
       </button>
     </div>
   </header>
@@ -85,12 +86,15 @@
               <div class="card-subtitle">Upload your laboratory qualitative or quantitative dataset (.CSV or .XLSX)</div>
             </div>
             <button class="btn btn-primary btn-sm btn-trigger-auto-report" title="Automatically analyze data and generate report">
-              ⚡ Generate Automatic Report
+              <svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              Generate Report
             </button>
           </div>
 
           <div class="drop-zone" id="drop-zone">
-            <div class="drop-icon">📂</div>
+            <div class="drop-icon">
+              <svg class="ui-icon ui-icon-lg" viewBox="0 0 24 24" style="color: var(--primary);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
             <div style="font-weight: 600; font-size: 1rem; color: var(--secondary);">Drop experimental data file here</div>
             <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">or click to browse from your workstation</div>
             <input type="file" id="file-input" accept=".csv, .xlsx, .xls" style="display: none;">
@@ -104,13 +108,14 @@
         <div class="card">
           <div class="card-header-flex">
             <div>
-              <h2 class="card-title">2. Natural Language Dataset Q&A Tool</h2>
-              <div class="card-subtitle">Ask questions directly grounded in the active dataset. Strictly limited knowledge outside data scope.</div>
+              <h2 class="card-title">2. Dataset Inquiries & Assistant</h2>
+              <div class="card-subtitle">Query dataset attributes, metrics, group comparisons, and hygiene profiles directly</div>
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
-              <span class="badge badge-success" id="qa-mode-badge">Document Grounded</span>
+              <span class="badge badge-success" id="qa-mode-badge">Data Grounded</span>
               <button class="btn btn-primary btn-sm btn-trigger-auto-report" title="Synthesize dynamic report based on active file">
-                ⚡ Generate Automatic Report
+                <svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                Generate Report
               </button>
             </div>
           </div>
@@ -119,26 +124,28 @@
           <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 1.1rem; margin-top: 0.25rem;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem;">
               <div style="font-weight: 700; font-size: 0.95rem; color: #1e3a8a; display: flex; align-items: center; gap: 0.4rem;">
-                <span>💬 Question & Answer Assistant</span>
+                <svg class="ui-icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <span>Interactive Dataset Assistant</span>
               </div>
-              <span style="font-size: 0.75rem; color: #64748b; font-weight: 500;">Zero-Hallucination &bull; Grounded in DataFrame</span>
+              <span style="font-size: 0.75rem; color: #64748b; font-weight: 500;">Zero-Hallucination &bull; Grounded in Active Data</span>
             </div>
 
             <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
               <input type="text" id="input-dataset-question" class="form-input" style="flex: 1;" placeholder="Ask anything about the uploaded dataset (e.g., 'Summarize dataset', 'What is the average of X?', 'Are there outliers?', 'Compare Y across groups')...">
               <button class="btn btn-primary" id="btn-ask-dataset" style="white-space: nowrap; display: flex; align-items: center; gap: 0.35rem;">
-                <span>🔍 Ask Dataset</span>
+                <svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <span>Ask Dataset</span>
               </button>
             </div>
 
             <!-- Suggested Question Pills -->
-            <div style="font-size: 0.78rem; color: #64748b; margin-bottom: 0.4rem; font-weight: 600;">Suggested inquiries for active dataset (click to ask):</div>
+            <div style="font-size: 0.78rem; color: #64748b; margin-bottom: 0.4rem; font-weight: 600;">Suggested inquiries for active dataset:</div>
             <div id="qa-suggested-pills" style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.75rem;">
-              <button class="btn btn-secondary btn-sm pill-btn" data-q="Summarize this dataset and list key attributes">📊 Dataset Summary</button>
-              <button class="btn btn-secondary btn-sm pill-btn" data-q="What is the primary research objective of this study?">🎯 Research Objective</button>
-              <button class="btn btn-secondary btn-sm pill-btn" data-q="Are there missing values or outliers in this dataset?">🔍 Missing & Outliers</button>
-              <button class="btn btn-secondary btn-sm pill-btn" data-q="What statistical tests are recommended for this dataset?">⚡ Recommended Tests</button>
-              <button class="btn btn-secondary btn-sm pill-btn" data-q="What does APA 7th require for reporting statistical results?">📐 APA 7th Standard</button>
+              <button class="btn btn-secondary btn-sm pill-btn" data-q="Summarize this dataset and list key attributes">Dataset Overview</button>
+              <button class="btn btn-secondary btn-sm pill-btn" data-q="What is the primary research objective of this study?">Research Objective</button>
+              <button class="btn btn-secondary btn-sm pill-btn" data-q="Are there missing values or outliers in this dataset?">Missing & Outliers</button>
+              <button class="btn btn-secondary btn-sm pill-btn" data-q="What statistical tests are recommended for this dataset?">Recommended Tests</button>
+              <button class="btn btn-secondary btn-sm pill-btn" data-q="What does APA 7th require for reporting statistical results?">APA 7th Standard</button>
             </div>
 
             <!-- Q&A Response Box -->
@@ -157,7 +164,10 @@
               <label class="form-label" for="input-objective" style="margin-bottom: 0; font-size: 0.82rem; color: #475569;">
                 <strong>Dataset Research Objective & Inquiries:</strong> <span style="font-weight: 400; color: #64748b;">(Auto-derived from file details; editable)</span>
               </label>
-              <button class="btn btn-secondary btn-sm" id="btn-update-obj" style="padding: 2px 8px; font-size: 0.75rem;">💾 Save Objective</button>
+              <button class="btn btn-secondary btn-sm" id="btn-update-obj" style="padding: 2px 8px; font-size: 0.75rem;">
+                <svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Save Objective
+              </button>
             </div>
             <textarea id="input-objective" class="form-textarea" rows="2" style="font-size: 0.85rem;" placeholder="Automatically synthesized upon dataset upload, or enter your custom research inquiry..."></textarea>
           </div>
@@ -197,7 +207,8 @@
             <div class="card-subtitle">Automated hygiene checks: missingness patterns, severe outliers, skewness</div>
           </div>
           <button class="btn btn-success btn-sm" id="btn-clean-data">
-            ✨ Auto Impute & Clean Dataset
+            <svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+            Auto Impute & Clean Dataset
           </button>
         </div>
         <div id="eda-issues-container"></div>
@@ -254,7 +265,10 @@
       <div class="card" style="border: 2px solid #bfdbfe;">
         <div class="card-header-flex">
           <div>
-            <h2 class="card-title" style="color: #1e40af;">🤖 AI Recommended Statistical Procedures</h2>
+            <h2 class="card-title" style="color: #1e40af; display: flex; align-items: center; gap: 0.5rem;">
+              <svg class="ui-icon" style="color: #2563eb;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <span>Recommended Statistical Procedures</span>
+            </h2>
             <div class="card-subtitle">Heuristically mapped to your data distributions, sample size, and research objectives</div>
           </div>
         </div>
@@ -409,7 +423,7 @@
         <div class="grid-3" style="margin-bottom: 1.25rem;">
           <!-- 1. Research Bar Chart -->
           <div class="stat-box" style="text-align: left;">
-            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">📊 Bar Chart (Means ± SEM / Counts)</div>
+            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">Bar Chart (Means ± SEM / Counts)</div>
             <label style="font-size: 0.75rem; color: var(--text-muted);">Category / X-Axis:</label>
             <select class="form-select" id="vis-bar-cat" style="margin-bottom: 0.4rem;"></select>
             <label style="font-size: 0.75rem; color: var(--text-muted);">Metric / Y-Axis (Optional for Means):</label>
@@ -421,7 +435,7 @@
 
           <!-- 2. Pie & Donut Chart -->
           <div class="stat-box" style="text-align: left;">
-            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">🍩 Pie & Donut (Proportions)</div>
+            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">Donut & Pie Proportions</div>
             <label style="font-size: 0.75rem; color: var(--text-muted);">Categorical Variable:</label>
             <select class="form-select" id="vis-pie-cat" style="margin-bottom: 0.4rem;"></select>
             <label style="font-size: 0.75rem; color: var(--text-muted);">Style:</label>
@@ -435,7 +449,7 @@
 
           <!-- 3. Box & Violin -->
           <div class="stat-box" style="text-align: left;">
-            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">🎻 Box & Violin by Group</div>
+            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">Box & Violin by Group</div>
             <label style="font-size: 0.75rem; color: var(--text-muted);">Continuous Variable:</label>
             <select class="form-select" id="vis-box-cont" style="margin-bottom: 0.4rem;"></select>
             <label style="font-size: 0.75rem; color: var(--text-muted);">Grouping Factor:</label>
@@ -446,7 +460,7 @@
 
           <!-- 4. Scatter & Regression -->
           <div class="stat-box" style="text-align: left;">
-            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">📈 Scatter & OLS Trendline</div>
+            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">Scatter & OLS Fit</div>
             <label style="font-size: 0.75rem; color: var(--text-muted);">X-Axis Variable:</label>
             <select class="form-select" id="vis-scat-x" style="margin-bottom: 0.4rem;"></select>
             <label style="font-size: 0.75rem; color: var(--text-muted);">Y-Axis Variable:</label>
@@ -456,7 +470,7 @@
 
           <!-- 5. Distribution -->
           <div class="stat-box" style="text-align: left;">
-            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">📉 Distribution & Histogram</div>
+            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">Distribution & Histogram</div>
             <label style="font-size: 0.75rem; color: var(--text-muted);">Continuous Column:</label>
             <select class="form-select" id="vis-dist-col" style="margin-bottom: 0.4rem;"></select>
             <label style="font-size: 0.75rem; color: var(--text-muted);">Group By (Optional):</label>
@@ -466,7 +480,7 @@
 
           <!-- 6. Longitudinal / Trendline -->
           <div class="stat-box" style="text-align: left;">
-            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">📉 Experimental Trajectory</div>
+            <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.5rem;">Experimental Trajectory</div>
             <label style="font-size: 0.75rem; color: var(--text-muted);">X-Axis (Ordered/Time):</label>
             <select class="form-select" id="vis-line-x" style="margin-bottom: 0.4rem;"></select>
             <label style="font-size: 0.75rem; color: var(--text-muted);">Y-Axis Variable:</label>
@@ -486,11 +500,12 @@
       <!-- Human-in-the-Loop Validation Control Bar -->
       <div class="validation-banner no-print">
         <div>
-          <div style="font-weight: 700; color: #065f46; font-size: 1rem;">
-            🛡️ Human-in-the-Loop Research Validation Mode
+          <div style="font-weight: 700; color: #065f46; font-size: 1rem; display: flex; align-items: center; gap: 0.45rem;">
+            <svg class="ui-icon" style="color: #059669;" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>Research Verification & Peer Sign-Off</span>
           </div>
           <div style="font-size: 0.85rem; color: #166534; margin-top: 2px;">
-            Cross-check statistical statements, edit draft interpretations, and sign off on laboratory publication readiness.
+            Cross-check statistical statements, edit draft interpretations, and verify publication readiness.
           </div>
         </div>
         <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -508,22 +523,29 @@
         <div class="card-header-flex">
           <div>
             <h2 class="card-title">Academic Manuscript Studio</h2>
-            <div class="card-subtitle">Choose Automatic Generation with Predefined Template or Customize Manually</div>
+            <div class="card-subtitle">Choose Standard Report Synthesis or Custom Outline Builder</div>
           </div>
           <!-- Mode Toggle Tabs -->
           <div style="display: flex; gap: 0.5rem;">
-            <button class="btn btn-sm btn-primary" id="btn-mode-auto">⚡ Automatic Template</button>
-            <button class="btn btn-sm btn-secondary" id="btn-mode-manual">🛠️ Manual Custom Builder</button>
+            <button class="btn btn-sm btn-primary" id="btn-mode-auto">
+              <svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Standard Template
+            </button>
+            <button class="btn btn-sm btn-secondary" id="btn-mode-manual">
+              <svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Custom Builder
+            </button>
           </div>
         </div>
 
         <!-- Automatic Report Panel -->
         <div id="panel-report-auto" style="padding-top: 0.75rem;">
           <p style="font-size: 0.9rem; color: #475569; margin-bottom: 1rem; line-height: 1.5;">
-            Automatically synthesize an empirical academic manuscript using the <strong>Standard Predefined Research Template</strong>. This end-to-end mode incorporates your stated research objective, data health profiling, all computed hypothesis tests, and attached charts.
+            Synthesize a publication-formatted academic manuscript using the <strong>Standard Empirical Research Template</strong>. This end-to-end mode incorporates your stated research objective, data health profiling, all computed hypothesis tests, and attached charts.
           </p>
           <button class="btn btn-primary" id="btn-generate-report-auto">
-            ⚡ Generate Automatic Report
+            <svg class="ui-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Generate Manuscript
           </button>
         </div>
 
@@ -559,7 +581,7 @@
           <div class="form-group" style="margin-bottom: 1rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; gap: 0.5rem;">
               <label class="form-label" style="margin-bottom: 0; font-weight: 700; color: #1e3a8a;">
-                📋 Custom Template Outline (Reflected for This Report Only)
+                Custom Template Outline (Reflected for This Report Only)
               </label>
               <div style="display: flex; gap: 0.4rem; font-size: 0.75rem;">
                 <span style="color: #64748b; align-self: center;">Quick Outlines:</span>
@@ -593,7 +615,8 @@
           </div>
 
           <button class="btn btn-primary" id="btn-generate-report-manual">
-            🛠️ Compile Custom Manual Report
+            <svg class="ui-icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Compile Custom Report
           </button>
         </div>
       </div>
@@ -602,21 +625,28 @@
       <div class="card no-print" style="margin-bottom: 1.5rem; background: #f8fafc; border: 1.5px dashed #cbd5e1;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
           <div>
-            <div style="font-weight: 700; color: #1e3a8a; font-size: 1.05rem;">💾 Save Report to Local Device</div>
-            <div style="font-size: 0.82rem; color: #64748b;">Download and save your verified manuscript in your preferred document format:</div>
+            <div style="font-weight: 700; color: #1e3a8a; font-size: 1.05rem; display: flex; align-items: center; gap: 0.4rem;">
+              <svg class="ui-icon" style="color: #2563eb;" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>Export Manuscript</span>
+            </div>
+            <div style="font-size: 0.82rem; color: #64748b;">Save your verified manuscript in your preferred document format:</div>
           </div>
           <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
             <button class="btn btn-secondary btn-sm" id="btn-export-docx" title="Download formatted Word document">
-              📄 Download Word (.docx)
+              <svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              Word (.docx)
             </button>
             <button class="btn btn-secondary btn-sm" id="btn-export-markdown" title="Download raw Markdown text">
-              📝 Download Markdown (.md)
+              <svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+              Markdown (.md)
             </button>
             <button class="btn btn-secondary btn-sm" id="btn-export-html" title="Download standalone HTML document">
-              🌐 Download HTML (.html)
+              <svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              HTML (.html)
             </button>
             <button class="btn btn-secondary btn-sm" id="btn-export-pdf" title="Print or save as PDF">
-              🖨️ Print / Save as PDF
+              <svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              Print / PDF
             </button>
           </div>
         </div>
@@ -626,7 +656,7 @@
       <article class="academic-manuscript" id="manuscript-paper">
         <h1 id="rep-title">No Academic Report Generated Yet</h1>
         <div class="manuscript-meta" id="rep-meta">
-          Upload a dataset in Tab 1 and click '⚡ Generate Automatic Report' to synthesize your publication-grade manuscript.
+          Upload a dataset in Tab 1 and select 'Generate Report' to synthesize your publication-grade manuscript.
         </div>
 
         <div style="text-align: center; margin-bottom: 1.5rem;" id="rep-status-badge-container">
@@ -731,13 +761,13 @@
   <script src="./static/js/vendor/xlsx.full.min.js"></script>
   
   <!-- ResAI Client-Side In-Browser Scientific Engines -->
-  <script src="./static/js/resai-stats.js"></script>
-  <script src="./static/js/resai-eda.js"></script>
-  <script src="./static/js/resai-rag.js"></script>
-  <script src="./static/js/resai-qa.js"></script>
-  <script src="./static/js/resai-report.js"></script>
+  <script src="./static/js/resai-stats.js?v=2.0"></script>
+  <script src="./static/js/resai-eda.js?v=2.0"></script>
+  <script src="./static/js/resai-rag.js?v=2.0"></script>
+  <script src="./static/js/resai-qa.js?v=2.0"></script>
+  <script src="./static/js/resai-report.js?v=2.0"></script>
 
   <!-- Front-End Application Logic -->
-  <script src="./static/js/app.js"></script>
+  <script src="./static/js/app.js?v=2.0"></script>
 </body>
 </html>

@@ -128,9 +128,9 @@
 
 ${content}
 
-🔬 **Cross-Checked Evidence from Active Dataset '${filename}':**${appBlock}
+**Evidence from Active Dataset '${filename}':**${appBlock}
 
-💡 *All statements formatted in compliance with APA 7th Edition standards based on active data.*`,
+*All statements formatted in compliance with APA 7th Edition standards based on active data.*`,
           source: `RAG Retrieval & Dataset Cross-Check (${title})`,
           grounded: true
         };
@@ -164,12 +164,12 @@ ${content}
 
 ${content}
 
-🔬 **Cross-Checked Data Hygiene Audit on '${filename}':**
+**Data Quality Assessment on '${filename}':**
 - **Missingness Assessment:** ${missingCells} cells (${missingRate}%). ${missingRate < 5 ? 'Complies with the < 5% threshold for standard imputation.' : 'Exceeds 5% threshold; sensitivity audit recommended.'}
 - **Tukey Outlier Audit (1.5×IQR):**
 ${outlierMsg}
 
-💡 *Audited deterministically against raw observations in '${filename}'.*`,
+*Audited deterministically against raw observations in '${filename}'.*`,
           source: `RAG Protocol Cross-Checked with Dataset (${title})`,
           grounded: true
         };
@@ -186,12 +186,12 @@ ${outlierMsg}
 
 ${content}
 
-🔬 **Cross-Checked Hypotheses Formulated for '${filename}':**
+**Hypotheses Formulated for '${filename}':**
 - **Primary Study Inquiry:** "${obj}"
 - **Null Hypothesis (H₀):** There is no significant difference or relationship in \`${cText}\` across \`${gText}\` (effect size = 0, p ≥ 0.05).
 - **Alternative Hypothesis (H₁):** There is a statistically significant effect in \`${cText}\` across \`${gText}\` at pre-specified α = 0.05.
 
-💡 *Hypotheses framed directly on active dataset variables.*`,
+*Hypotheses framed directly on active dataset variables.*`,
           source: `RAG Protocol Cross-Checked with Dataset (${title})`,
           grounded: true
         };
@@ -204,7 +204,7 @@ ${content}
 
 ${content}
 
-🔬 **Context in '${filename}':** ${rows.length} observations across ${numCols.length} continuous metrics and ${catCols.length} categorical factors.`,
+**Dataset Context in '${filename}':** ${rows.length} observations across ${numCols.length} continuous metrics and ${catCols.length} categorical factors.`,
         source: `RAG Knowledge Base (${title})`,
         grounded: true
       };
@@ -256,7 +256,7 @@ ${content}
 - **Categorical Factors (${catCols.length}):** ${catSummary}
 - **Hygiene Index:** Health Score **${health}%** (${missing} missing cells)${objLine}
 
-💡 *All statistics computed deterministically from active DataFrame with zero hallucination.*`,
+*All statistics computed deterministically from active DataFrame with zero hallucination.*`,
           source: "Document Grounded Profile Summary",
           grounded: true
         };
@@ -291,7 +291,7 @@ This inquiry dictates automated hypothesis model recommendations and academic re
 `**Recommended Statistical Tests for '${filename}':**
 ${recLines}
 
-*These tests can be computed automatically via the '⚡ Generate Automatic Report' button.*`,
+*These tests can be computed automatically via the 'Generate Automatic Report' button.*`,
             source: "Statistical Recommender Engine",
             grounded: true
           };
@@ -433,7 +433,7 @@ ${recLines}
             });
 
             if (bestMinG && bestMaxG && bestMinG !== bestMaxG) {
-              lines.push(`\n💡 Lowest mean is **${bestMinG}** (${bestMinM.toFixed(2)}); Highest mean is **${bestMaxG}** (${bestMaxM.toFixed(2)}).`);
+              lines.push(`\nLowest mean is **${bestMinG}** (${bestMinM.toFixed(2)}); Highest mean is **${bestMaxG}** (${bestMaxM.toFixed(2)}).`);
             }
 
             return {

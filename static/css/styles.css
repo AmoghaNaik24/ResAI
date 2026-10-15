@@ -301,6 +301,30 @@ main.app-main {
   min-height: 90px;
 }
 
+/* SVG UI Icons */
+.ui-icon {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  stroke-width: 2;
+  stroke: currentColor;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -0.15em;
+  flex-shrink: 0;
+}
+
+.ui-icon-lg {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.ui-icon-sm {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
 /* Buttons */
 .btn {
   display: inline-flex;

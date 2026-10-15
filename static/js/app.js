@@ -237,16 +237,19 @@ function showUploadSuccessBanner(filename, rows, cols) {
   banner.innerHTML = `
     <div style="padding: 1rem 1.25rem; background: #ecfdf5; border: 1.5px solid #10b981; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 4px rgba(0,0,0,0.04); flex-wrap: wrap; gap: 0.75rem;">
       <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <span style="font-size: 1.6rem;">✅</span>
+        <span style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; background: #d1fae5; color: #059669;">
+          <svg class="ui-icon" style="width: 20px; height: 20px;" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        </span>
         <div>
-          <div style="font-weight: 700; color: #065f46; font-size: 0.95rem;">File Uploaded Successfully!</div>
+          <div style="font-weight: 700; color: #065f46; font-size: 0.95rem;">Dataset Verified & Loaded</div>
           <div style="font-size: 0.85rem; color: #047857; margin-top: 2px;">
-            <strong>${escapeHtml(filename)}</strong> &bull; ${rows.toLocaleString()} records &bull; ${cols} variables
+            <strong>${escapeHtml(filename)}</strong> &bull; ${rows.toLocaleString()} observations &bull; ${cols} variables
           </div>
         </div>
       </div>
       <button class="btn btn-primary btn-sm btn-trigger-auto-report" style="box-shadow: 0 2px 4px rgba(37,99,235,0.2);">
-        ⚡ Generate Automatic Report
+        <svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Generate Full Report
       </button>
     </div>
   `;
@@ -683,7 +686,7 @@ function createChartCard(title, chartType) {
         <div style="font-size: 0.8rem; color: #64748b;">${escapeHtml(chartType)} &bull; Interactive Publication Figure</div>
       </div>
       <div style="display: flex; gap: 0.4rem;">
-        <button class="btn btn-secondary btn-sm btn-add-chart-report">➕ Add to Report</button>
+        <button class="btn btn-secondary btn-sm btn-add-chart-report">Include in Report</button>
         <button class="btn btn-secondary btn-sm btn-remove-chart">✕</button>
       </div>
     </div>
@@ -697,13 +700,13 @@ function createChartCard(title, chartType) {
     isAdded = !isAdded;
     if (isAdded) {
       state.reportCharts.push({ chartId, title, chartType });
-      addBtn.innerHTML = "✓ Attached to Report";
+      addBtn.innerHTML = "Included in Report";
       addBtn.classList.add("btn-success");
       addBtn.classList.remove("btn-secondary");
       showNotification(`Attached "${title}" to draft manuscript.`, "success");
     } else {
       state.reportCharts = state.reportCharts.filter(c => c.chartId !== chartId);
-      addBtn.innerHTML = "➕ Add to Report";
+      addBtn.innerHTML = "Include in Report";
       addBtn.classList.remove("btn-success");
       addBtn.classList.add("btn-secondary");
       showNotification(`Removed "${title}" from report.`, "info");
@@ -1553,8 +1556,8 @@ function updateSuggestedQuestions(profile) {
   const pills = [];
 
   // Summary & Objective
-  pills.push({ label: "📊 Dataset Summary", q: "Summarize this dataset and list key attributes" });
-  pills.push({ label: "🎯 Research Objective", q: "What is the primary research objective of this study?" });
+  pills.push({ label: "Dataset Overview", q: "Summarize this dataset and list key attributes" });
+  pills.push({ label: "Research Objective", q: "What is the primary research objective of this study?" });
 
   if (numCols.length > 0) {
     pills.push({ label: `Mean ${numCols[0]}`, q: `What is the average of ${numCols[0]}?` });
@@ -1570,7 +1573,7 @@ function updateSuggestedQuestions(profile) {
   }
 
   pills.push({ label: "Missing & Outliers", q: "Are there missing values or outliers in this dataset?" });
-  pills.push({ label: "⚡ Recommended Tests", q: "What statistical tests should I run for this dataset?" });
+  pills.push({ label: "Recommended Tests", q: "What statistical tests should I run for this dataset?" });
   pills.push({ label: "APA 7th Standard", q: "What does APA 7th require for reporting statistical results?" });
 
   pillsContainer.innerHTML = pills.map(p => 
@@ -1603,3 +1606,5 @@ function escapeHtml(text) {
   if (typeof text !== "string") return text;
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+
+// v=1.1
