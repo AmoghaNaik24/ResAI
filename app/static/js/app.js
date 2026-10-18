@@ -465,19 +465,13 @@ function initLandingTabListeners() {
 
   btnRemoveTemplate?.addEventListener("click", removeCustomTemplate);
 
-  // Action Buttons: Initial Review & Confirm Mappings
+  // Action Button: Direct Adaptive Report Generation
   document.getElementById("btn-generate-landing-report")?.addEventListener("click", () => {
     if (!state.currentDataset) {
       showToast("Upload file first", "warning");
       return;
     }
-    const mappingPanel = document.getElementById("landing-mapping-panel");
-    if (mappingPanel && mappingPanel.style.display === "none") {
-      renderFieldMappingUI();
-      mappingPanel.scrollIntoView({ behavior: 'smooth' });
-    } else {
-      executeVerifiedReportWorkflow();
-    }
+    executeVerifiedReportWorkflow();
   });
 
   document.getElementById("btn-confirm-mappings-generate")?.addEventListener("click", executeVerifiedReportWorkflow);
@@ -528,6 +522,153 @@ function initLandingTabListeners() {
 
   document.getElementById("btn-landing-goto-review")?.addEventListener("click", () => {
     switchTab("review");
+  });
+
+  // Initialize In-Browser Local AI (WebGPU) Controller
+  initLocalAIListeners();
+}
+
+// ==========================================
+// Local In-Browser AI (WebGPU) Controller
+// ==========================================
+async function initLocalAIListeners() {
+  const statusBadge = document.getElementById("local-ai-status-badge");
+  const initBtn = document.getElementById("btn-init-local-ai");
+  const unloadBtn = document.getElementById("btn-unload-local-ai");
+  const modelSelect = document.getElementById("select-local-model");
+  const progressContainer = document.getElementById("local-ai-progress-container");
+  const progressBar = document.getElementById("local-ai-progress-bar");
+  const progressText = document.getElementById("local-ai-progress-text");
+  const progressPercent = document.getElementById("local-ai-progress-percent");
+  const incompatibleBox = document.getElementById("local-ai-incompatible-box");
+  const incompatibleReason = document.getElementById("local-ai-incompatible-reason");
+
+  if (!window.ResAILocalLLM) return;
+
+  // 1. Initial WebGPU hardware compatibility check
+  try {
+    const compat = await window.ResAILocalLLM.checkWebGPUCompatibility();
+    if (compat.supported) {
+      if (statusBadge) {
+        statusBadge.textContent = "WebGPU Available (Local AI Supported)";
+        statusBadge.style.background = "#eff6ff";
+        statusBadge.style.color = "#1e40af";
+        statusBadge.style.border = "1px solid #bfdbfe";
+      }
+      if (initBtn) initBtn.disabled = false;
+    } else {
+      if (statusBadge) {
+        statusBadge.textContent = "WebGPU Incompatible (Deterministic Mode Active)";
+        statusBadge.style.background = "#fffbeb";
+        statusBadge.style.color = "#92400e";
+        statusBadge.style.border = "1px solid #fde68a";
+      }
+      if (incompatibleBox) incompatibleBox.style.display = "block";
+      if (incompatibleReason) incompatibleReason.textContent = compat.reason;
+      if (initBtn) {
+        initBtn.disabled = true;
+        initBtn.title = "WebGPU not supported in this browser. Deterministic engine active.";
+      }
+    }
+  } catch (err) {
+    console.warn("WebGPU compatibility check error:", err);
+  }
+
+  // 2. Initialize button click
+  initBtn?.addEventListener("click", async () => {
+    const chosenModel = modelSelect ? modelSelect.value : "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
+    const modelMeta = window.ResAILocalLLM.getSupportedModels().find(m => m.id === chosenModel);
+    const sizeMb = modelMeta ? modelMeta.downloadSizeMB : 350;
+
+    initBtn.disabled = true;
+    if (modelSelect) modelSelect.disabled = true;
+    if (progressContainer) progressContainer.style.display = "block";
+    if (statusBadge) {
+      statusBadge.textContent = `Downloading ${chosenModel.split("-")[0]} (~${sizeMb} MB)...`;
+      statusBadge.style.background = "#eff6ff";
+      statusBadge.style.color = "#1d4ed8";
+    }
+
+    try {
+      showToast(`Initializing ${modelMeta?.name || 'Local AI'} (~${sizeMb} MB download on first run)...`, "info");
+
+      await window.ResAILocalLLM.initModel(chosenModel, (progress) => {
+        if (progressBar) progressBar.style.width = `${progress.percent}%`;
+        if (progressPercent) progressPercent.textContent = `${progress.percent}%`;
+        if (progressText) progressText.textContent = progress.text;
+      });
+
+      if (statusBadge) {
+        statusBadge.textContent = `Local AI Ready: ${modelMeta?.name || 'Active'}`;
+        statusBadge.style.background = "#ecfdf5";
+        statusBadge.style.color = "#065f46";
+        statusBadge.style.border = "1px solid #a7f3d0";
+      }
+
+      initBtn.style.display = "none";
+      if (unloadBtn) unloadBtn.style.display = "inline-block";
+      if (progressContainer) {
+        setTimeout(() => {
+          progressContainer.style.display = "none";
+        }, 1500);
+      }
+
+      showToast(`Local LLM (${modelMeta?.name}) is ready. Inference runs 100% locally on your GPU.`, "success");
+
+      // If dataset & template are already loaded, re-run template interpretation with local LLM
+      if (window.ResAIWorkflowEngine && window.ResAIWorkflowEngine.templateJSON && window.ResAIWorkflowEngine.profileJSON) {
+        const userContext = {
+          document_title: document.getElementById("study-context-title")?.value?.trim() || null,
+          researcher_name: document.getElementById("study-context-author")?.value?.trim() || "Lead Researcher",
+          research_objective: document.getElementById("study-context-objective")?.value?.trim() || state.objective || null,
+          literature_sources: document.getElementById("study-context-literature")?.value?.trim()
+            ? document.getElementById("study-context-literature").value.split("\n").map(s => s.trim()).filter(Boolean)
+            : null
+        };
+        const llmDecisions = await window.ResAILocalLLM.generateTemplateDecisions(
+          window.ResAIWorkflowEngine.templateJSON,
+          window.ResAIWorkflowEngine.profileJSON,
+          userContext,
+          window.ResAIWorkflowEngine
+        );
+        window.ResAIWorkflowEngine.templateDecisionsJSON = llmDecisions;
+        renderFieldMappingUI();
+      }
+    } catch (err) {
+      console.error("Local LLM load failure:", err);
+      showToast(`Failed to initialize local LLM: ${err.message}. Reverting to deterministic mode.`, "danger");
+      if (statusBadge) {
+        statusBadge.textContent = "Initialization Failed (Deterministic Fallback)";
+        statusBadge.style.background = "#fef2f2";
+        statusBadge.style.color = "#b91c1c";
+        statusBadge.style.border = "1px solid #fecaca";
+      }
+      initBtn.disabled = false;
+      if (modelSelect) modelSelect.disabled = false;
+      if (progressContainer) progressContainer.style.display = "none";
+    }
+  });
+
+  // 3. Unload button click
+  unloadBtn?.addEventListener("click", async () => {
+    try {
+      await window.ResAILocalLLM.unloadModel();
+      if (statusBadge) {
+        statusBadge.textContent = "WebGPU Available (Local AI Supported)";
+        statusBadge.style.background = "#eff6ff";
+        statusBadge.style.color = "#1e40af";
+        statusBadge.style.border = "1px solid #bfdbfe";
+      }
+      if (initBtn) {
+        initBtn.disabled = false;
+        initBtn.style.display = "inline-block";
+      }
+      if (modelSelect) modelSelect.disabled = false;
+      if (unloadBtn) unloadBtn.style.display = "none";
+      showToast("Local LLM unloaded from GPU memory.", "info");
+    } catch (err) {
+      showToast(`Error unloading model: ${err.message}`, "warning");
+    }
   });
 }
 
@@ -769,6 +910,13 @@ function renderFieldMappingUI() {
   const secList = document.getElementById("section-decisions-list");
   if (secList && window.ResAIWorkflowEngine.templateDecisionsJSON) {
     const tDec = window.ResAIWorkflowEngine.templateDecisionsJSON;
+    const isLLM = tDec._engine_used === "local_llm";
+    const modeBadge = document.getElementById("section-plan-mode-badge");
+    if (modeBadge) {
+      modeBadge.textContent = isLLM ? `Local AI (${tDec._model_id ? tDec._model_id.split("-")[0] : "WebGPU"})` : "Automated Deterministic";
+      modeBadge.style.background = isLLM ? "#eff6ff" : "#f1f5f9";
+      modeBadge.style.color = isLLM ? "#1e40af" : "#475569";
+    }
     const decisions = tDec.sections || [];
     let html = "";
 
@@ -809,8 +957,9 @@ function renderFieldMappingUI() {
     secList.innerHTML = html;
   }
 
-  mappingPanel.style.display = "block";
-  if (initialCard) initialCard.style.display = "none";
+  // Keep mapping panel hidden from user view (runs seamlessly in background)
+  mappingPanel.style.display = "none";
+  if (initialCard) initialCard.style.display = "block";
 }
 
 // ==========================================
@@ -824,11 +973,21 @@ function executeVerifiedReportWorkflow() {
 
   const progressElem = document.getElementById("landing-pipeline-progress");
   const outcomeCard = document.getElementById("landing-report-outcome");
+  const mappingPanel = document.getElementById("landing-mapping-panel");
+  const genBtn = document.getElementById("btn-generate-landing-report");
+  const originalBtnHtml = genBtn ? genBtn.innerHTML : "";
   const statusText = document.getElementById("pipeline-status-text");
   const counterText = document.getElementById("pipeline-step-counter");
 
-  if (progressElem) progressElem.style.display = "block";
+  // Keep intermediate panels hidden from user
+  if (mappingPanel) mappingPanel.style.display = "none";
+  if (progressElem) progressElem.style.display = "none";
   if (outcomeCard) outcomeCard.style.display = "none";
+
+  if (genBtn) {
+    genBtn.disabled = true;
+    genBtn.innerHTML = `<span class="spinner" style="width: 16px; height: 16px; border-width: 2px; display: inline-block; vertical-align: middle; margin-right: 0.5rem;"></span> Generating Adaptive Report...`;
+  }
 
   const setStep = (stepNum, text) => {
     if (statusText) statusText.textContent = text;
@@ -864,11 +1023,32 @@ function executeVerifiedReportWorkflow() {
             : null
         };
 
-        window.ResAIWorkflowEngine.interpretTemplate(
-          window.ResAIWorkflowEngine.templateJSON,
-          window.ResAIWorkflowEngine.profileJSON,
-          userContext
-        );
+        // Stage 3 & 4: Template Interpretation (Local LLM if ready, else deterministic)
+        if (window.ResAILocalLLM && window.ResAILocalLLM.state === "ready") {
+          try {
+            setStep(3, "3. Local LLM interpreting unfamiliar template & running deterministic computations...");
+            const llmDecisions = await window.ResAILocalLLM.generateTemplateDecisions(
+              window.ResAIWorkflowEngine.templateJSON,
+              window.ResAIWorkflowEngine.profileJSON,
+              userContext,
+              window.ResAIWorkflowEngine
+            );
+            window.ResAIWorkflowEngine.templateDecisionsJSON = llmDecisions;
+          } catch (llmErr) {
+            console.warn("Local LLM interpretation error, safely falling back to deterministic engine:", llmErr);
+            window.ResAIWorkflowEngine.interpretTemplate(
+              window.ResAIWorkflowEngine.templateJSON,
+              window.ResAIWorkflowEngine.profileJSON,
+              userContext
+            );
+          }
+        } else {
+          window.ResAIWorkflowEngine.interpretTemplate(
+            window.ResAIWorkflowEngine.templateJSON,
+            window.ResAIWorkflowEngine.profileJSON,
+            userContext
+          );
+        }
 
         window.ResAIWorkflowEngine.confirmAllMappings();
         window.ResAIWorkflowEngine.createAnalysisPlan();
@@ -915,6 +1095,11 @@ function executeVerifiedReportWorkflow() {
           }
           if (statusText) statusText.textContent = "Pipeline execution complete. Manuscript synthesized.";
 
+          if (genBtn) {
+            genBtn.disabled = false;
+            genBtn.innerHTML = originalBtnHtml;
+          }
+
           // Save report to History
           saveReportToHistory(reportData);
 
@@ -925,6 +1110,10 @@ function executeVerifiedReportWorkflow() {
         }, 300);
       }, 300);
     } catch (err) {
+      if (genBtn) {
+        genBtn.disabled = false;
+        genBtn.innerHTML = originalBtnHtml;
+      }
       console.error("Workflow execution failed:", err);
       showToast("Error generating report: " + err.message, "danger");
       if (statusText) statusText.textContent = "Error: " + err.message;

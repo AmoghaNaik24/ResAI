@@ -517,7 +517,15 @@
             totalMissing++;
           } else {
             uniqueSet.add(v);
-            const num = Number(v);
+            let num = Number(v);
+            if (isNaN(num) && typeof v === "string") {
+              const cleaned = v.replace(/,/g, "").trim();
+              const match = cleaned.match(/^([+-]?\d+(?:\.\d+)?)/);
+              if (match && !/^\d{4}[-\/]\d{2}[-\/]\d{2}/.test(cleaned)) {
+                const parsed = Number(match[1]);
+                if (!isNaN(parsed)) num = parsed;
+              }
+            }
             if (!isNaN(num) && typeof v !== "boolean") {
               numericVals.push(num);
             }
@@ -591,6 +599,7 @@
       if (/^(\d+[\.\)]\s*)?(abstract|executive\s+summary)/i.test(h)) return "abstract";
       if (/title\s*page|front\s*matter|cover\s*page|^title$/i.test(h)) return "title_page";
       if (/^(\d+[\.\)]\s*)?(literature\s*review|related\s*work|scholarly\s*sources|theoretical\s*framework)/i.test(h)) return "literature_review";
+      if (/cohort\s*(comparison|difference)|subgroup\s*analysis|between\s*group|treatment\s*vs\s*control/i.test(h)) return "cohort_comparison";
       if (/^(\d+[\.\)]\s*)?(introduction|background|problem\s*statement)/i.test(h)) return "introduction";
       if (/^(\d+[\.\)]\s*)?(methodology|methods|procedure|empirical\s*approach|materials|data\s*collection)/i.test(h)) return "methodology";
       if (/^(\d+[\.\)]\s*)?(results|findings|statistical\s*analysis|quantitative\s*findings)/i.test(h)) return "analytical_results";
@@ -730,6 +739,20 @@
             }
             break;
 
+          case "cohort_comparison":
+            if (!hasGrouping) {
+              decision = "omit";
+              reason = "Section requires categorical grouping cohorts, but input dataset lacks a valid grouping factor. Eliminated to prevent ungrounded claims.";
+              status = "omitted";
+              isRequired = false;
+            } else {
+              decision = "generate";
+              reason = "Synthesize empirical between-cohort statistical comparisons from verified data.";
+              evidenceSources = ["verified_results_json"];
+              plannedOutputs = ["between_cohort_inferences"];
+            }
+            break;
+
           case "discussion":
             decision = "adapt";
             reason = "Interpret findings strictly in relation to observed data boundaries and stated research objectives without speculative causal claims.";
@@ -838,7 +861,9 @@
       const meanScore = resMap["mean_score"] ? resMap["mean_score"].formatted_value : "N/A";
       const standardDeviation = resMap["standard_deviation"] ? resMap["standard_deviation"].formatted_value : "N/A";
       const hasHypothesisTest = resMap["p_value"] && resMap["p_value"].status === "computed";
-      const objective = u.research_objective || `investigate empirical baseline distributions and relationships among variables in ${datasetName}`;
+      const contColName = (resMap["mean_score"] && resMap["mean_score"].input_columns && resMap["mean_score"].input_columns[0]) || "";
+      const varDesc = contColName ? contColName.replace(/_/g, " ") : "continuous outcome measures";
+      const objective = u.research_objective || `evaluate empirical distributions of ${varDesc} across validated observations in ${datasetName}`;
 
       switch (sectionType) {
         case "title_page":
@@ -873,7 +898,7 @@
           let resultsInferentialText = hasHypothesisTest
             ? `Hypothesis testing was conducted to evaluate differences between experimental cohorts. As reported in Table 1, the analysis revealed ${resMap["inferential_significance_statement"].formatted_value} (${resMap["test_statistic"].formatted_value}, p = ${resMap["p_value"].formatted_value}, ${resMap["effect_size"].formatted_value}).`
             : "Hypothesis testing was not conducted due to the absence of a categorical grouping variable with two or more distinct levels. Numerical reporting was constrained to verified descriptive and distributional parameters.";
-          return `Comprehensive statistical summaries were computed for validated observations (N = ${sampleSize}). The primary continuous outcome measure yielded an arithmetic mean of ${meanScore} (SD = ${standardDeviation}). ${resultsInferentialText}\n\n### Table 1: Verified Quantitative Findings & Statistical Inferences\n| Metric / Measure | Verified Value | Statistical Procedure |\n| :--- | :--- | :--- |\n| Sample Size (N) | ${sampleSize} | Valid Record Count |\n| Arithmetic Mean | ${meanScore} | Sample Mean |\n| Sample Standard Deviation | ${standardDeviation} | Bessel's Correction (N-1) |\n| Data Health Score | ${healthScore} | Hygiene Index Algorithm |\n| Missingness Rate | ${missingRate} | Cell Missing Percentage |${hasHypothesisTest ? `\n| Test Statistic | ${resMap["test_statistic"].formatted_value} | ${resMap["test_statistic"].method} |\n| p-value | ${resMap["p_value"].formatted_value} | Two-Tailed t Distribution |\n| Effect Size | ${resMap["effect_size"].formatted_value} | Pooled Cohen's d |` : ''}`;
+          return `Comprehensive statistical summaries were computed for validated observations (N = ${sampleSize}). The primary continuous outcome measure (${varDesc}) yielded an arithmetic mean of ${meanScore} (SD = ${standardDeviation}). ${resultsInferentialText}\n\n### Table 1: Verified Quantitative Findings & Statistical Inferences\n| Metric / Measure | Verified Value | Statistical Procedure |\n| :--- | :--- | :--- |\n| Sample Size (N) | ${sampleSize} | Valid Record Count |\n| Arithmetic Mean (${varDesc}) | ${meanScore} | Sample Mean |\n| Sample Standard Deviation | ${standardDeviation} | Bessel's Correction (N-1) |\n| Data Health Score | ${healthScore} | Hygiene Index Algorithm |\n| Missingness Rate | ${missingRate} | Cell Missing Percentage |${hasHypothesisTest ? `\n| Test Statistic | ${resMap["test_statistic"].formatted_value} | ${resMap["test_statistic"].method} |\n| p-value | ${resMap["p_value"].formatted_value} | Two-Tailed t Distribution |\n| Effect Size | ${resMap["effect_size"].formatted_value} | Pooled Cohen's d |` : ''}`;
 
         case "discussion":
           let discInferential = hasHypothesisTest
@@ -1226,11 +1251,24 @@
           return;
         }
 
-        // Filter missing or non-numeric values
-        const validNumericVals = rows
-          .map(r => r[colName])
-          .filter(v => v !== null && v !== undefined && v !== "" && !isNaN(Number(v)))
-          .map(Number);
+        // Filter missing or non-numeric values (supporting unit-suffixed values like '5 LPA')
+        const validNumericVals = [];
+        rows.forEach(r => {
+          const v = r[colName];
+          if (v === null || v === undefined || v === "") return;
+          let num = Number(v);
+          if (isNaN(num) && typeof v === "string") {
+            const cleaned = v.replace(/,/g, "").trim();
+            const match = cleaned.match(/^([+-]?\d+(?:\.\d+)?)/);
+            if (match && !/^\d{4}[-\/]\d{2}[-\/]\d{2}/.test(cleaned)) {
+              const parsed = Number(match[1]);
+              if (!isNaN(parsed)) num = parsed;
+            }
+          }
+          if (!isNaN(num) && typeof v !== "boolean") {
+            validNumericVals.push(num);
+          }
+        });
 
         if (validNumericVals.length === 0) {
           resultMap[op.output_field] = {
@@ -1295,10 +1333,19 @@
         rows.forEach(r => {
           const g = r[grpCol];
           const y = r[contCol];
-          if (g !== null && g !== undefined && y !== null && y !== undefined && !isNaN(Number(y))) {
+          if (g === null || g === undefined || y === null || y === undefined || y === "") return;
+          let numY = Number(y);
+          if (isNaN(numY) && typeof y === "string") {
+            const match = String(y).replace(/,/g, "").trim().match(/^([+-]?\d+(?:\.\d+)?)/);
+            if (match) {
+              const parsed = Number(match[1]);
+              if (!isNaN(parsed)) numY = parsed;
+            }
+          }
+          if (!isNaN(numY) && typeof y !== "boolean") {
             const gStr = String(g).trim();
             if (!groupMap[gStr]) groupMap[gStr] = [];
-            groupMap[gStr].push(Number(y));
+            groupMap[gStr].push(numY);
           }
         });
 
@@ -1488,20 +1535,38 @@
       const sectionReplacementMap = {};
 
       // Prepare section replacements for adaptive and generated sections
-      this.templateDecisionsJSON.sections.forEach(dec => {
+      for (const dec of this.templateDecisionsJSON.sections) {
         if (["adapt", "generate", "populate", "ask_user"].includes(dec.decision)) {
-          const narrative = this._synthesizeSectionNarrative(
+          let narrative = this._synthesizeSectionNarrative(
             dec.section_type,
             dec.original_heading,
             this.userContext || {},
             resMap,
             this.profileJSON
           );
+
+          // If in-browser Local LLM is active and ready, generate grounded narrative
+          if (typeof window !== 'undefined' && window.ResAILocalLLM && window.ResAILocalLLM.state === "ready") {
+            try {
+              const llmNarrative = await window.ResAILocalLLM.generateSectionProse(
+                { heading: dec.original_heading, section_type: dec.section_type },
+                this.userContext || {},
+                this.verifiedResultsJSON,
+                narrative
+              );
+              if (llmNarrative && llmNarrative.text) {
+                narrative = llmNarrative.text;
+              }
+            } catch (llmErr) {
+              console.warn("Local LLM section prose generation error, using deterministic narrative:", llmErr);
+            }
+          }
+
           sectionReplacementMap[dec.section_id] = narrative;
           sectionReplacementMap[dec.original_heading.toLowerCase()] = narrative;
           sectionReplacementMap[dec.section_type] = narrative;
         }
-      });
+      }
 
       tpl.sections.forEach(sec => {
         const secDec = this.templateDecisionsJSON.sections.find(d =>
@@ -1544,7 +1609,11 @@
           });
         } else {
           // Adapt or generate section narrative based on empirical data
-          const narrative = this._synthesizeSectionNarrative(secType, sec.heading, this.userContext || {}, resMap, this.profileJSON);
+          const narrative = sectionReplacementMap[sec.section_id] ||
+            sectionReplacementMap[sec.heading.toLowerCase()] ||
+            sectionReplacementMap[secType] ||
+            this._synthesizeSectionNarrative(secType, sec.heading, this.userContext || {}, resMap, this.profileJSON);
+
           assembledSections.push({
             section_id: sec.section_id,
             heading: sec.heading,
