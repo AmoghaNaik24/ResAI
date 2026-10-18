@@ -1,177 +1,225 @@
-# ResAI: Client-Side Research Data Analysis & Reporting Platform
-> **analysis made easy** &bull; 100% Client-Side Web Application &bull; Deployable Free on GitHub Pages
+# ResAI: AI-Assisted Research Data Analysis and Reporting Platform
+> Report-First Workflow - Dual Edition: Local Python Backend (FastAPI and Ollama) and Client-Side Web Application (GitHub Pages)
 
-ResAI is an enterprise-grade, precision laboratory research automation platform designed to assist researchers across quantitative and qualitative workflows. It runs **entirely inside the user's browser** with **zero server dependencies, zero Python runtime requirements, and zero API keys needed**.
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg)](https://fastapi.tiangolo.com)
+[![Privacy Guarantee](https://img.shields.io/badge/Data%20Privacy-100%25%20Local%20%26%20Private-success.svg)](#zero-hallucination-and-privacy-guarantee)
+[![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 
-Users can visit the public URL, upload arbitrary datasets (`.csv`, `.xlsx`, `.xls`), audit data hygiene, run exact hypothesis tests, render publication charts, ask dataset-grounded questions, synthesize structured academic manuscripts, and download reports locally.
+ResAI is an academic research automation platform designed to assist laboratory investigators, clinical scientists, and quantitative analysts across data profiling, hypothesis testing, and reporting workflows.
+
+ResAI adopts a Report-First architecture: users upload an experimental dataset, optionally provide an existing report template, and immediately receive a publication-grade academic manuscript complete with APA 7th statistics, structured tables, publication figures, and grounded narrative interpretations.
 
 ---
 
-## 🚀 Instant GitHub Pages Deployment Guide
+## Dual-Edition Deployment Model
 
-Deploy ResAI to GitHub Pages for free in 4 simple steps:
+ResAI runs in two complementary modes:
 
-### Step 1: Push Repository to GitHub
-Ensure the codebase (including `index.html` at root and the `static/` directory) is pushed to your GitHub repository:
-```bash
-git add .
-git commit -m "Convert ResAI to 100% client-side GitHub Pages web application"
-git push origin main
+| Capability | Local Python Edition (`main.py` / FastAPI) | Static Web Edition (GitHub Pages / Standalone HTML) |
+|---|---|---|
+| Runtime Environment | Local Python runtime (`uvicorn`, Python 3.10+) | Any modern browser (Chrome, Edge, Firefox, Safari) |
+| Server Dependencies | Zero external cloud servers; runs on `localhost:8000` | Zero server dependencies; 100% client-side |
+| Statistical Computation | SciPy, Statsmodels, NumPy | Browser-native Lanczos Log-Gamma, Incomplete Beta and Gamma |
+| AI Narrative Engine | Local Ollama LLM (`llama3`, `mistral`, `qwen2.5`) + Deterministic | Browser-native Deterministic Academic Engine |
+| Document Export | Native Microsoft Word (`.docx`), Markdown, HTML, PDF | Word MIME (`.doc`), Markdown, HTML, Print/PDF |
+| Mathematical Validation | Python `ClaimValidator` and `StatisticalSchema` | Browser-native `ReportGenerator.auditReportClaims` |
+| Cost and Cloud Privacy | Free and Open Source - 100% Private (No data leaves machine) | Free and Open Source - 100% Private (No data leaves browser) |
+
+---
+
+## Six-Tab Report-First User Interface
+
+Navigation across tabs 2 to 6 is locked until a research dataset is uploaded. If a user attempts to navigate prior to uploading, a toast notification prompts: *"Upload file first"*.
+
+Once loaded, the dataset is locked into the active session to prevent accidental replacement until the user explicitly clicks *"Start New Report / Upload New Dataset"*.
+
+```
++---------------------------------------------------------------------------------------------------------+
+| [1. Generate Report] [2. EDA & Feature Eng] [3. Stats] [4. Visuals] [5. Report & Validation] [6. History]|
++---------------------------------------------------------------------------------------------------------+
 ```
 
-### Step 2: Open GitHub Repository Settings
-1. Navigate to your repository on [GitHub](https://github.com/).
-2. Click on the **Settings** tab (the gear icon at the top of the repository).
+### 1. Tab 1 - Generate Report (Default Landing Tab)
+- **Dataset Ingestion**: Drag-and-drop or browse `.csv`, `.xlsx`, or `.xls` research data.
+- **Session Locking**: Once uploaded, the dataset is locked into memory with record counts displayed. Users click *"Start New Report"* to reset the session.
+- **Existing Report / Template Upload**: Upload an existing Word (`.docx`), Markdown (`.md`), or Text (`.txt`) report. ResAI extracts the required sections (Abstract, Introduction, Methodology, Results, Discussion, Limitations, Conclusion) and renders extracted section badges.
+- **Direct Report Generation**: Click *"Generate Research Report"* to run the automated pipeline. If an existing template is uploaded, the report is compiled based on the uploaded template's outline and structure; otherwise, the standard APA 7th academic template is used.
+- **5-Step Automated Execution Pipeline**:
+  1. Dataset Ingestion and Schema Validation
+  2. Data Health Profiling and Imputation
+  3. Inferential Hypothesis Testing
+  4. Grounded Narrative Synthesis
+  5. Claim Validation Audit
+- **Instant Report Outcome Card**:
+  - Highlights: Health index, sample size N, significant findings count (p < .05), and claim grounding percentage.
+  - Executive Abstract and verified inferential findings preview.
+  - Direct downloads: Download Word (`.docx`), Markdown (`.md`), or Print / PDF directly from Tab 1.
 
-### Step 3: Enable GitHub Pages
-1. In the left-hand sidebar under **Code and automation**, click **Pages**.
-2. Under **Build and deployment**:
-   - **Source**: Select **Deploy from a branch**.
-   - **Branch**: Select `main` (or `master`), and leave the folder set to `/ (root)`.
-3. Click **Save**.
+### 2. Tab 2 - Exploratory Data Analysis & Feature Engineering
+- **Dataset Attributes and Schema Inspection**: Sheet selector for Excel workbooks, total observations (N), total variables (P), continuous measures count, and categorical factors count.
+- **Data Quality and Hygiene Profiling**: Health score (0-100%), missing cell rate, outlier counts, duplicate row analysis, and hygiene notices.
+- **Feature Engineering and Preprocessing Studio**:
+  - *Missing Value Imputation*: Impute by Mean, Median, Mode, or drop rows with missing values.
+  - *Outlier Treatment*: IQR boundary clipping (1.5x IQR), percentile Winsorization (5th - 95th percentile), or outlier row removal.
+  - *Scaling and Transformations*: Log transformation ln(x + 1), Z-score standardization, and Min-Max normalization (0 to 1).
+  - *Categorical Encoding*: One-hot dummy variable generation with automatic schema updates.
+  - *1-Click Auto Clean*: Auto-impute and clean dataset with duplicate removal.
+- **Variable Profiling Audit Table**: Column types, missing percentages, uniqueness ratios, skewness metrics, and outlier counts.
+- **Raw Observations Inspector**: Paginated inspection of the first 15 records in memory.
 
-### Step 4: Access Your Live Web App
-GitHub Pages will automatically build and publish your site in about 1–2 minutes. Your live application will be accessible at:
-```
-https://<your-username>.github.io/<your-repository-name>/
-```
-> **Note on Asset Paths**: All stylesheets, scripts, and vendor assets use relative paths (`./static/...`), ensuring complete portability whether deployed at a custom domain, GitHub Pages sub-path, or opened directly from your local filesystem.
+### 3. Tab 3 - Hypothesis Testing & Statistics
+- **Recommended Statistical Procedures**: Heuristically mapped to variable types, distributions, and sample size.
+- **Descriptive Statistics Table**: Mean +- SD, 95% Confidence Intervals, Median (IQR), Range (Min - Max), Skewness, and Shapiro-Wilk normality p-values.
+- **Interactive Statistical Calculators**:
+  - *Two-Sample Comparison*: Student's t-test, Welch's t-test, Mann-Whitney U, and Cohen's d effect sizes.
+  - *One-Way ANOVA & Post-Hoc Tukey HSD*: Omnibus F-test, eta-squared variance explained, and pairwise contrasts.
+  - *OLS Multiple Linear Regression*: Dependent outcome modeling with R-squared, adjusted R-squared, F-test, predictor coefficients, standard errors, and p-values.
+  - *Bivariate Correlations*: Pearson linear correlation matrix and Spearman rank non-parametric correlation.
+  - *Chi-Square Test of Independence*: Contingency tables, Chi-Square statistic, degrees of freedom, and Cramer's V.
 
----
-
-## 💻 Local Testing & Offline Use
-
-You can also run ResAI locally without an internet connection:
-
-### Option A: Open Directly in Any Modern Web Browser
-Simply double-click `index.html` in your file explorer, or right-click `index.html` &rarr; *Open With* &rarr; *Google Chrome / Microsoft Edge / Firefox / Safari*.
-
-### Option B: Local Static Server
-```bash
-# Using Python built-in static server (port 8000 or 8088):
-python -m http.server 8088
-
-# Or using Node.js npx serve:
-npx serve .
-```
-Open `http://localhost:8088` in your browser.
-
----
-
-## 🔒 100% Client-Side Privacy & Security Guarantee
-
-- **Zero Server Uploads**: When you upload a dataset, the file is read directly into your browser's local memory via standard HTML5 File APIs (`FileReader`, `ArrayBuffer`).
-- **Data Privacy**: No data rows, metadata, research notes, or questions are ever sent to an external server or third-party cloud service.
-- **Zero Hallucination / Zero Fake Math**: All statistical calculations are deterministic, verified mathematical algorithms (Lanczos Log-Gamma, Regularized Incomplete Beta & Gamma distributions) yielding exact $p$-values and test statistics equivalent to SciPy.
-- **No API Keys Required**: No OpenAI, Anthropic, or external API keys are needed to use the platform.
-
----
-
-## 🔄 Client-Side Porting: Replaced Features & Technology Architecture
-
-To transition from a Python/FastAPI backend to an autonomous browser-compatible web application, runtime dependencies were replaced with high-performance client-side implementations:
-
-| Feature Area | Original Server Architecture | Browser Client-Side Replacement | Engine Implementation Details |
-|---|---|---|---|
-| **Web Server / Routing** | FastAPI + Uvicorn | Pure Static Single-Page App (`index.html`) | Relative pathing (`./static/...`) compatible with GitHub Pages subpaths. |
-| **CSV Parsing** | Pandas `pd.read_csv` | **PapaParse** (`papaparse.min.js`) | Multi-threaded client-side CSV parsing with automatic delimiter and type inference. |
-| **Excel Parsing** | Pandas `pd.read_excel` (openpyxl) | **SheetJS** (`xlsx.full.min.js`) | In-browser binary spreadsheet parsing supporting `.xlsx` and `.xls`. |
-| **Data Profiling & EDA** | Custom Pandas hygiene pipeline | `resai-eda.js` (`EDAProfiler`) | Real-time calculation of Health Score (0-100%), missing cells, skewness, and Tukey $1.5 \times \text{IQR}$ fences. |
-| **1-Click Data Cleaning** | Pandas imputation routines | `resai-eda.js` (`cleanDataset`) | In-memory median/mode imputation, row deduplication, and zero-variance cleanup. |
-| **Inferential Statistics** | SciPy `stats` & Statsmodels `OLS` | `resai-stats.js` (`StatisticalEngine`) | Pure JS math engine implementing Lanczos approximation, Incomplete Beta $I_x(a,b)$, and Upper Incomplete Gamma $Q(a,x)$ for exact Student/Welch t-tests, One-Way ANOVA, Tukey HSD, OLS Regression, Pearson/Spearman correlation matrices, and Chi-Square tests. |
-| **Publication Visualizations** | Plotly Python / Matplotlib | **Plotly.js** CDN & Vendor Fallback | Interactive charts: SEM error-bar bar graphs, donut/pie charts, box/violin distributions, bivariate correlation heatmaps, and scatter plots with OLS trendlines. |
-| **RAG Knowledge Base** | Scikit-learn `TfidfVectorizer` | `resai-rag.js` (`RAGEngine`) | In-memory TF-IDF vectorizer and cosine similarity search. Supports custom guideline indexing with browser `localStorage` persistence. |
-| **Dataset Q&A Tool** | Server endpoint cross-checking | `resai-qa.js` (`DatasetQAEngine`) | Grounded dataframe cross-checking with strict out-of-scope guardrail: *"Knowledge is limited regarding this inquiry based on the active dataset and methodology library."* |
-| **Academic Manuscript Studio** | Jinja2 templates + `python-docx` | `resai-report.js` (`ReportGenerator`) | Dynamic grounded title synthesis, automated empirical manuscript generation, manual builder custom outline support, and in-browser Word (`.doc` XML MIME), Markdown (`.md`), HTML, and PDF print exports. |
-
----
-
-## 🌟 Step-by-Step Workflow & Feature Tour
-
-### Tab 1: Ingest & Dataset Q&A
-- **Dataset Ingestion**: Drag-and-drop or browse arbitrary `.csv`, `.xlsx`, or `.xls` files. File parsing occurs entirely within browser memory in milliseconds.
-- **Natural Language Dataset Q&A**: Ask ad-hoc questions grounded in the active dataset. Click suggested inquiry pills (*Dataset Summary*, *Research Objective*, *Missing & Outliers*, *Recommended Tests*, *APA 7th Standard*) or type custom questions.
-- **Strict Guardrail**: If an inquiry falls outside the active dataset scope, the engine responds: *"Knowledge is limited regarding this inquiry based on the active dataset and methodology library."*
-- **Research Objective Synthesis**: Automatically derives an empirical research objective and manuscript title based on variable types and sample structure.
-- **Dataset Presence Guard**: Attempting to switch tabs or run reports without an uploaded file displays a user-friendly toast warning: *"Dataset not uploaded. Please upload a dataset in Tab 1 first."*
-
-### Tab 2: Data Health & Automated Profiling
-- **Health Metrics Overview**: Displays 4 responsive summary cards: Data Health Index (0-100%), Total Observations ($N$), Variables/Features count, and Missing Cell Rate (%).
-- **Hygiene & Preprocessing Notices**: Automatic flagging of missingness patterns, severe outliers, and distribution skewness.
-- **1-Click Auto Impute & Clean**: Automatically imputes missing values (median for continuous, mode for categorical) and purges duplicate rows directly in client memory.
-- **Variable Profiling Audit**: Detailed audit table with inferred data types, unique counts, skewness, and IQR outlier boundaries.
-- **Empirical Dataset Preview**: Inspect the first 10 raw records loaded in laboratory memory.
-
-### Tab 3: Hypothesis Testing & Statistical Modeling
-- **🤖 AI Recommended Procedures**: Recommends appropriate statistical tests based on sample size, variable scale, and research goals.
-- **Descriptive Statistics**: Calculates Mean $\pm$ SD, 95% Confidence Intervals, Median (IQR), Range (Min – Max), Skewness, and Normality p-values.
-- **Two-Sample Comparison**: Student's t-test and Welch's t-test with Cohen's $d$ effect sizes.
-- **One-Way ANOVA & Post-hoc Tukey HSD**: Omnibus $F$-test, degrees of freedom, $\eta^2$ effect magnitude, and pairwise Tukey contrasts.
-- **OLS Multiple Linear Regression**: Ordinary Least Squares fit with $R^2$, Adjusted $R^2$, $F$-test, coefficient estimates, standard errors, $t$-values, and $p$-values.
-- **Bivariate Correlation**: Pearson $r$ or Spearman $\rho$ pairwise correlation matrices with exact $p$-values.
-- **Chi-Square Test**: Contingency tables with Pearson's $\chi^2$, degrees of freedom, and Cramér's $V$.
-- **APA 7th Edition Output**: Generates verifiable statistical statements:
-  $$F(2, 117) = 137.54, p < .001, \eta^2 = 0.70$$
-  $$t(118) = 4.21, p < .001, d = 0.85$$
-
-### Tab 4: Publication Visualizations
-- **Bivariate Correlation Heatmap**: Interactive diverging heatmap with numerical Pearson coefficients.
+### 4. Tab 4 - Publication Visualizations
+- **Bivariate Correlation Heatmap**: Interactive matrix with Pearson correlation coefficients.
 - **Publication Chart Studio**:
-  - *Bar Charts*: Group means with $\pm 1 \text{ SEM}$ error bars or categorical frequency counts.
-  - *Pie & Donut Charts*: Modern donut or full pie distributions for demographic shares.
-  - *Box & Violin Plots*: Group variance with jittered observation points and median markers.
-  - *Scatter Plots with OLS Trendline*: Bivariate scatter overlaid with linear fit lines.
-  - *Distribution Histograms*: Continuous distribution bins with density curves.
-  - *Experimental Trajectories*: Longitudinal trendlines over ordered stages or time points.
-- **Attach to Manuscript**: 1-click button to attach any generated figure into the academic report stream.
+  - *Research Bar Chart*: Group means with Standard Error of the Mean (SEM) error bars or observation counts.
+  - *Donut and Pie Proportions*: Category distribution slices.
+  - *Box and Violin Plots*: Median, quartiles, and distribution spreads across experimental cohorts.
+  - *Scatter and OLS Fit*: Bivariate scatter plots with linear regression trendlines.
+  - *Distribution Histograms*: Continuous metric frequency distributions.
+  - *Experimental Trajectory Plots*: Time-series and ordered observation trendlines.
 
-### Tab 5: Academic Report & Human-in-the-Loop Validation
-- **Academic Manuscript Studio Modes**:
-  - **⚡ Automatic Template**: 1-click compilation of a complete empirical research manuscript incorporating research objectives, data profiling, hypothesis testing results, and attached figures.
-  - **🛠️ Manual Custom Builder**: Tailor manuscript title, author, style preset, and provide a **custom template outline** (e.g. *Academic Standard*, *Executive Brief*, *Clinical Cohort*) with markdown placeholders (`{{abstract}}`, `{{descriptive_statistics_table}}`, `{{hypothesis_testing_results}}`, `{{discussion}}`, `{{conclusions}}`). Reflected specifically for that report compilation.
-- **Human-in-the-Loop Sign-Off**:
-  - Review status dropdown (`DRAFT_PENDING_REVIEW`, `VERIFIED_BY_RESEARCHER`, `APPROVED_FOR_PUBLICATION`).
-  - Peer review and laboratory sign-off notes area.
-- **Multi-Format Local Export**:
-  - 📄 **Word (`.docx`)**: Formatted document compatible with Microsoft Word, LibreOffice, and Google Docs with full CSS table styling.
-  - 📝 **Markdown (`.md`)**: Raw formatted markdown text.
-  - 🌐 **HTML (`.html`)**: Standalone, portable HTML page.
-  - 🖨️ **Print / Save as PDF**: Print preview formatted using clean `@media print` academic typography.
+### 5. Tab 5 - Academic Report & Validation
+- **Template Adaptation**: If an existing report template was uploaded, the report is structured and rendered according to the uploaded template's sections; otherwise, the standard APA 7th academic template is used.
+- **Human-in-the-Loop Sign-Off Bar**: Researcher review status (*Draft Pending Review*, *Verified by Researcher*, *Approved for Publication*) with notes persistence.
+- **Claim Validation Audit**:
+  - Mathematical verification of all numbers, sample sizes, and p-values against computed dataset outputs.
+  - Grounding Score percentage (e.g. 100% Grounded) and highlighted verified ground truth vs warning flags.
+  - Re-Audit Claims button to re-verify after manuscript revisions.
+- **Academic Manuscript Section Editor**: In-place editable sections for Abstract, Introduction, Data Methodology, Results, Discussion, Limitations, and Conclusions.
+- **Exporters**: Word (`.docx`), Markdown (`.md`), HTML (`.html`), and Print / PDF.
 
-### Tab 6: RAG & Methodology Library
-- **Indexed Methodology Store**: Grounding rules for APA 7th statistical reporting, Null Hypothesis Significance Testing (NHST), research data cleansing, and manuscript structure.
-- **Real-Time Search**: Search guidelines with instant TF-IDF cosine relevance ranking.
-- **Custom Protocol Indexing**: Upload laboratory protocols or professor grading rubrics; persisted across sessions in browser `localStorage`.
+### 6. Tab 6 - Report History
+- **Research Tracking**: Persists generated reports over time across sessions using browser storage.
+- **History Table**: Displays Date and Time, Report Title, Dataset Name, Sample Size (N), Health Score, and Primary Test Finding.
+- **Quick Actions**: View in Report Tab, Download Word (`.docx`), Download Markdown (`.md`), and Delete Report.
+- **Clear History**: Wipe stored report history with a single click.
 
 ---
 
-## 📁 Repository Structure
+## Quickstart: Running the Local Python Backend
+
+### 1. Prerequisites
+- Python 3.10, 3.11, 3.12, or 3.13
+- (Optional) [Ollama](https://ollama.com/) installed for local LLM narrative generation
+
+### 2. Installation
+```bash
+git clone https://github.com/AmoghaNaik24/ResAI.git
+cd ResAI
+pip install -r requirements.txt
+```
+
+### 3. Launching the Application
+```bash
+python main.py
+```
+Or start via uvicorn directly:
+```bash
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+Navigate to **`http://127.0.0.1:8000`** in your browser.
+
+### 4. (Optional) Enabling Local Ollama LLMs
+ResAI works 100% offline out-of-the-box using its deterministic academic engine. To enable local LLM narrative generation:
+```bash
+# 1. Install and start Ollama (https://ollama.com)
+# 2. Pull your preferred model:
+ollama pull llama3
+```
+
+---
+
+## Quickstart: Deploying to GitHub Pages (Static Web Edition)
+
+The static web edition runs completely inside the user's browser with zero backend servers:
+
+1. Ensure the root contains `index.html` and the `static/` directory.
+2. Push your changes to GitHub:
+   ```bash
+   git add .
+   git commit -m "Update ResAI to Report-First Architecture"
+   git push origin main
+   ```
+3. In your GitHub repository, navigate to **Settings** -> **Pages**.
+4. Under **Build and deployment**, select **Deploy from a branch**, choose branch **`main`**, and folder **`/ (root)`**. Click **Save**.
+
+---
+
+## Zero-Hallucination and Privacy Guarantee
+
+1. **Deterministic Calculations Only**: All summary tables, t-tests, ANOVAs, regression models, and correlations are computed via mathematical code (SciPy/Statsmodels in Python; Lanczos approximation in JS). LLMs are never permitted to calculate numbers independently.
+2. **Schema-Grounded Prompting**: When generating natural language, models are provided with a strictly typed `ValidatedStatisticalSchema` containing only computed facts, with explicit negative constraints against number alteration.
+3. **Automated Claim Validation Engine**: Every generated sentence is scanned for numbers and verified against the computed registry. Unsupported figures are flagged with a caveat warning.
+4. **100% Local Privacy**: No data rows, patient records, or experimental measurements are sent to third-party cloud servers.
+
+---
+
+## Running the Test Suite
+
+```bash
+python -m pytest tests -v
+```
+
+Output:
+```text
+tests/test_pipeline.py::test_health_check PASSED
+tests/test_pipeline.py::test_full_pipeline_clinical PASSED
+==================== 2 passed in 10.71s ====================
+```
+
+---
+
+## Project Structure
 
 ```
 Project4-1/
-├── index.html                   # Static entry point for GitHub Pages deployment
-├── README.md                    # Documentation & GitHub Pages deployment instructions
-├── static/                      # Static client-side assets
-│   ├── css/
-│   │   └── styles.css           # Modern design tokens, glassmorphism, responsive styles
-│   └── js/
-│       ├── app.js               # Application coordinator & UI tab event controller
-│       ├── resai-eda.js         # Client-side data profiling & 1-click hygiene engine
-│       ├── resai-qa.js          # Grounded dataset Q&A tool with strict guardrails
-│       ├── resai-rag.js         # TF-IDF methodology indexing & retrieval engine
-│       ├── resai-report.js      # Dynamic report synthesizer & document exporters
-│       ├── resai-stats.js       # SciPy-equivalent client-side statistical engine
-│       └── vendor/
-│           ├── papaparse.min.js # In-browser CSV parsing library
-│           └── xlsx.full.min.js # In-browser Excel (.xlsx/.xls) parsing library
+├── app/
+│   ├── api/
+│   │   ├── eda.py
+│   │   ├── hypothesis.py
+│   │   ├── rag.py
+│   │   └── report.py
+│   ├── core/
+│   │   ├── claim_validator.py
+│   │   ├── docx_template_engine.py
+│   │   ├── eda_profiler.py
+│   │   ├── llm_service.py
+│   │   ├── report_generator.py
+│   │   ├── statistical_engine.py
+│   │   └── statistical_schema.py
+│   ├── static/
+│   │   ├── css/styles.css
+│   │   └── js/
+│   │       ├── app.js
+│   │       ├── resai-eda.js
+│   │       ├── resai-report.js
+│   │       └── resai-stats.js
+│   └── templates/
+│       └── index.html
 ├── data/
-│   └── uploads/                 # Sample research datasets for local testing
-└── docs/                        # Documentation and architecture assets
+│   ├── reports/
+│   └── uploads/
+├── static/
+│   ├── css/styles.css
+│   └── js/
+│       ├── app.js
+│       ├── resai-eda.js
+│       ├── resai-report.js
+│       └── resai-stats.js
+├── tests/
+│   └── test_pipeline.py
+├── index.html
+├── main.py
+├── requirements.txt
+└── README.md
 ```
-
----
-
-## 📄 License & Attribution
-
-ResAI Platform is designed for academic, clinical, and scientific research. Built for reliable, deterministic, and verifiable empirical research data analysis.
-*analysis made easy* &bull; Zero Server &bull; Zero API Keys &bull; 100% Free Hosting on GitHub Pages.

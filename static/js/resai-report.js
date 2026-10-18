@@ -278,9 +278,9 @@
 
       const conclusionsText = 
 `In conclusion, empirical analysis of '${datasetName}' regarding "${activeObj}" demonstrates clear statistical findings:
-• Retain validated test statistics and exact APA statements in the master research register.
-• Execute human-in-the-loop researcher verification to finalize narrative conclusions.
-• Archive computed tables and attached publication figures as supplementary research materials.`;
+- Retain validated test statistics and exact APA statements in the master research register.
+- Execute human-in-the-loop researcher verification to finalize narrative conclusions.
+- Archive computed tables and attached publication figures as supplementary research materials.`;
 
       const docGroundingMd = 
 `- **APA 7th Edition Standards**: Applied for procedural compliance, exact reporting formatting, and significance thresholds.
@@ -356,6 +356,125 @@
         conclusions: context.conclusions,
         document_grounding: context.document_grounding,
         attached_charts: attachedCharts
+      };
+
+      const audit = ReportGenerator.auditReportClaims(
+        renderedMarkdown,
+        edaSummary,
+        statisticalResults,
+        {}
+      );
+      reportObj.claim_audit = audit;
+
+      return reportObj;
+    },
+
+    auditReportClaims(reportText, edaSummary = {}, statisticalResults = [], summaryStats = {}) {
+      if (!reportText) {
+        return {
+          total_claims_checked: 0,
+          verified_claims_count: 0,
+          unsupported_claims_count: 0,
+          grounding_score_percent: 100,
+          claims: [],
+          general_warnings: ["No text provided for claim verification."]
+        };
+      }
+
+      const truth = [];
+      if (edaSummary.total_rows) truth.push({ val: edaSummary.total_rows, ref: `Total Observations N=${edaSummary.total_rows}` });
+      if (edaSummary.health_score) truth.push({ val: edaSummary.health_score, ref: `Health Index ${edaSummary.health_score}%` });
+      if (edaSummary.missing_rate_overall) truth.push({ val: edaSummary.missing_rate_overall, ref: `Missing Rate ${edaSummary.missing_rate_overall}%` });
+
+      (statisticalResults || []).forEach((res, i) => {
+        const tType = res.test_type || `Test ${i+1}`;
+        if (res.p_value !== undefined) truth.push({ val: res.p_value, ref: `${tType} p-value (${res.p_value})` });
+        if (res.t_statistic !== undefined) truth.push({ val: res.t_statistic, ref: `${tType} t-statistic` });
+        if (res.f_statistic !== undefined) truth.push({ val: res.f_statistic, ref: `${tType} F-statistic` });
+        if (res.chi2_statistic !== undefined) truth.push({ val: res.chi2_statistic, ref: `${tType} Chi-Square` });
+        if (res.correlation !== undefined) truth.push({ val: res.correlation, ref: `${tType} r` });
+        if (res.effect_size && res.effect_size.value !== undefined) {
+          truth.push({ val: res.effect_size.value, ref: `${tType} effect size` });
+        }
+        if (res.eta_squared !== undefined) truth.push({ val: res.eta_squared, ref: `${tType} eta-squared` });
+        if (res.r_squared !== undefined) truth.push({ val: res.r_squared, ref: `${tType} R-squared` });
+        if (res.group_1 && res.group_1.mean !== undefined) truth.push({ val: res.group_1.mean, ref: `${res.group_1.name || 'Group 1'} Mean` });
+        if (res.group_2 && res.group_2.mean !== undefined) truth.push({ val: res.group_2.mean, ref: `${res.group_2.name || 'Group 2'} Mean` });
+        if (res.group_stats) {
+          res.group_stats.forEach(g => {
+            if (g.mean !== undefined) truth.push({ val: g.mean, ref: `${g.group} Mean` });
+            if (g.std !== undefined) truth.push({ val: g.std, ref: `${g.group} Std Dev` });
+          });
+        }
+      });
+
+      const patterns = [
+        { re: /\b[pP]\s*[<=><≥≤]\s*([0-9]*\.[0-9]+)\b/g, label: "p-value", isThreshold: true },
+        { re: /\b[mM]\s*=\s*([0-9]+\.?[0-9]*)\b/g, label: "Mean (M)" },
+        { re: /\b[sS][dD]\s*=\s*([0-9]+\.?[0-9]*)\b/g, label: "Standard Deviation (SD)" },
+        { re: /\b[nN]\s*=\s*([0-9]+)\b/g, label: "Sample Size (N)" },
+        { re: /\b(?:Cohen['’]?s\s*d|d)\s*=\s*([0-9]+\.?[0-9]*)\b/g, label: "Cohen's d" },
+        { re: /\b(?:η²|eta-squared|eta²)\s*=\s*([0-9]+\.?[0-9]*)\b/g, label: "Eta-squared" },
+        { re: /\b(?:R²|r²|R-squared)\s*=\s*([0-9]+\.?[0-9]*)\b/g, label: "R²" },
+        { re: /\b([0-9]+\.?[0-9]*)\s*%/g, label: "Percentage" }
+      ];
+
+      const sentences = reportText.split(/(?<=[.!?])\s+/);
+      const claims = [];
+
+      sentences.forEach(s => {
+        const cleanS = s.trim();
+        if (cleanS.length < 10) return;
+
+        patterns.forEach(p => {
+          let m;
+          const rx = new RegExp(p.re.source, 'g');
+          while ((m = rx.exec(cleanS)) !== null) {
+            const num = parseFloat(m[1]);
+            if (isNaN(num)) continue;
+
+            let isVerified = false;
+            let sourceRef = null;
+
+            if (p.isThreshold && (num === 0.05 || num === 0.01 || num === 0.001 || num === 0.1)) {
+              isVerified = true;
+              sourceRef = `Standard statistical significance threshold (alpha = ${num})`;
+            } else {
+              for (const t of truth) {
+                const diff = Math.abs(num - t.val);
+                const rel = diff / (Math.abs(t.val) + 1e-9);
+                if (diff <= 0.05 || rel <= 0.025 || Math.round(num * 10) === Math.round(t.val * 10)) {
+                  isVerified = true;
+                  sourceRef = t.ref;
+                  break;
+                }
+              }
+            }
+
+            claims.push({
+              claim_text: cleanS.length > 180 ? cleanS.slice(0, 180) + '...' : cleanS,
+              extracted_number: num,
+              metric_type: p.label,
+              is_verified: isVerified,
+              source_reference: sourceRef,
+              warning: isVerified ? null : `Value '${num}' (${p.label}) not found in computed active dataset results.`
+            });
+          }
+        });
+      });
+
+      const total = claims.length;
+      const verified = claims.filter(c => c.is_verified).length;
+      const unsupported = total - verified;
+      const pct = total > 0 ? Math.round((verified / total) * 1000) / 10 : 100;
+
+      return {
+        total_claims_checked: total,
+        verified_claims_count: verified,
+        unsupported_claims_count: unsupported,
+        grounding_score_percent: pct,
+        claims: claims,
+        general_warnings: unsupported > 0 ? [`Detected ${unsupported} numerical claim(s) lacking exact match in computed dataset outputs.`] : ['All detected numerical claims verified against active dataset ground truth.']
       };
     },
 

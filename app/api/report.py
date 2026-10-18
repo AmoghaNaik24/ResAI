@@ -1,15 +1,19 @@
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 import json
+import datetime
 from app.api.eda import ACTIVE_DATASET
 from app.core.eda_profiler import EDAProfiler
 from app.core.statistical_engine import StatisticalEngine
 from app.core.report_generator import ReportGenerator
 from app.core.rag_engine import rag_engine
-from app.config import REPORTS_DIR
+from app.core.claim_validator import ClaimValidator
+from app.core.llm_service import LLMService
+from app.core.docx_template_engine import DocxTemplateEngine
+from app.config import REPORTS_DIR, UPLOAD_DIR
 
 router = APIRouter(prefix="/api/report", tags=["Academic Report Generation & Human Validation"])
 
@@ -364,3 +368,88 @@ async def export_html():
         media_type="text/html",
         headers={"Content-Disposition": f"attachment; filename=Report_{r.get('report_id')}.html"}
     )
+
+
+@router.get("/llm-status")
+async def get_llm_status():
+    """Detects available local Ollama models and operational readiness."""
+    status = await LLMService.get_ollama_status()
+    return status
+
+
+class ValidateClaimsRequest(BaseModel):
+    report_text: str
+
+
+@router.post("/validate-claims")
+async def validate_narrative_claims(req: ValidateClaimsRequest):
+    """
+    Audits narrative text against active dataset ground-truth computations,
+    flagging ungrounded p-values, altered statistics, or hallucinated numbers.
+    """
+    df = ACTIVE_DATASET.get("df")
+    if df is None:
+        raise HTTPException(status_code=400, detail="No active dataset loaded.")
+
+    eda_summary = EDAProfiler.profile_dataset(df)
+    summary_stats = StatisticalEngine.get_summary_statistics(df)
+    statistical_results = []
+    if CURRENT_REPORT["data"] and "results" in CURRENT_REPORT["data"]:
+        statistical_results = [r.get("raw_data") for r in CURRENT_REPORT["data"]["results"] if r.get("raw_data")]
+
+    audit = ClaimValidator.audit_report_text(
+        report_text=req.report_text,
+        eda_summary=eda_summary,
+        statistical_results=statistical_results,
+        summary_stats=summary_stats
+    )
+    return {
+        "status": "success",
+        "audit": audit.model_dump() if hasattr(audit, "model_dump") else audit.dict()
+    }
+
+
+@router.post("/upload-template")
+async def upload_custom_template(file: UploadFile = File(...)):
+    """Uploads and parses a custom DOCX or Markdown report template."""
+    filename = file.filename or "custom_template.docx"
+    ext = Path(filename).suffix.lower()
+
+    if ext not in [".docx", ".md", ".txt"]:
+        raise HTTPException(status_code=400, detail="Only .docx, .md, and .txt templates are supported.")
+
+    content_bytes = await file.read()
+    template_id = f"tpl_{int(datetime.datetime.now().timestamp())}"
+
+    if ext == ".docx":
+        # Save temporary template file
+        save_path = REPORTS_DIR / f"{template_id}_{filename}"
+        with open(save_path, "wb") as f:
+            f.write(content_bytes)
+
+        # Parse text from DOCX
+        try:
+            from docx import Document
+            doc = Document(save_path)
+            extracted_text = "\n\n".join([p.text for p in doc.paragraphs if p.text.strip()])
+            tpl_obj = ReportGenerator.save_custom_template({
+                "id": template_id,
+                "name": f"Uploaded DOCX: {filename}",
+                "category": "Uploaded DOCX",
+                "description": f"Custom template parsed from {filename}",
+                "content": extracted_text
+            })
+            return {"status": "success", "template": tpl_obj}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to parse DOCX template: {str(e)}")
+    else:
+        # Plain text / Markdown
+        text = content_bytes.decode("utf-8", errors="replace")
+        tpl_obj = ReportGenerator.save_custom_template({
+            "id": template_id,
+            "name": f"Uploaded Outline: {filename}",
+            "category": "Uploaded Outline",
+            "description": f"Custom template parsed from {filename}",
+            "content": text
+        })
+        return {"status": "success", "template": tpl_obj}

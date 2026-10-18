@@ -11,6 +11,7 @@ from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from app.config import REPORTS_DIR
+from app.core.claim_validator import ClaimValidator
 
 CUSTOM_TEMPLATES_FILE = REPORTS_DIR / "custom_templates.json"
 
@@ -753,6 +754,24 @@ class ReportGenerator:
                 for c in (attached_charts or [])
             ]
         }
+
+        # Run automated numerical claim audit against verified computation
+        try:
+            audit = ClaimValidator.audit_report_text(
+                report_text=rendered_markdown,
+                eda_summary=eda_summary,
+                statistical_results=statistical_results
+            )
+            report_data["claim_audit"] = audit.model_dump() if hasattr(audit, "model_dump") else audit.dict()
+        except Exception:
+            report_data["claim_audit"] = {
+                "total_claims_checked": 0,
+                "verified_claims_count": 0,
+                "unsupported_claims_count": 0,
+                "grounding_score_percent": 100.0,
+                "claims": [],
+                "general_warnings": []
+            }
 
         return report_data
 

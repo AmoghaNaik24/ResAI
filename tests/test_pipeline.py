@@ -164,5 +164,24 @@ def test_full_pipeline_clinical():
             assert "Student" in edu_rep["title"] or "Exam" in edu_rep["title"] or "Predictors" in edu_rep["title"]
             assert "Clinical" not in edu_rep["title"]
             assert "Student_Academic_Predictors" in edu_rep["abstract"]
+
+            # 13. Test Claim Audit in generated report
+            assert "claim_audit" in edu_rep
+            assert "grounding_score_percent" in edu_rep["claim_audit"]
+
+            # 14. Test LLM Status endpoint (Ollama detection)
+            llm_res = await client.get("/api/report/llm-status")
+            assert llm_res.status_code == 200
+            llm_data = llm_res.json()
+            assert "status" in llm_data
+
+            # 15. Test Validate Claims endpoint
+            val_res = await client.post("/api/report/validate-claims", json={
+                "report_text": "The sample size was N = 120 with Mean = 45.2 and p = 0.042."
+            })
+            assert val_res.status_code == 200
+            val_data = val_res.json()
+            assert val_data["status"] == "success"
+            assert "audit" in val_data
     asyncio.run(_run())
 
