@@ -210,7 +210,7 @@
       </div>
 
       <!-- ==========================================
-           LOCAL IN-BROWSER AI (WebGPU MLC-AI Engine)
+           ON-DEVICE AI ASSISTANT (Researcher-Friendly)
            ========================================== -->
       <div id="local-ai-panel" class="card" style="margin-bottom: 1.5rem; border: 1px solid #cbd5e1; background: #ffffff;">
         <div class="card-header-flex" style="margin-bottom: 0.6rem;">
@@ -224,17 +224,17 @@
             </div>
             <div>
               <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <h2 class="card-title" style="font-size: 1.05rem; margin: 0;">Local AI Acceleration (WebGPU)</h2>
-                <span class="badge" id="local-ai-status-badge" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-size: 0.72rem; font-weight: 600;">Checking Hardware...</span>
+                <h2 class="card-title" style="font-size: 1.05rem; margin: 0;">On-Device AI Assistant</h2>
+                <span class="badge" id="local-ai-status-badge" style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.72rem; font-weight: 600;">Checking Availability...</span>
               </div>
               <div class="card-subtitle" style="font-size: 0.8rem; margin: 0;">
-                100% In-Browser Inference via @mlc-ai/web-llm • Zero external API keys • Zero cloud fallback • Completely private
+                Adapts narrative prose to your findings • 100% private on your computer • Zero data uploaded
               </div>
             </div>
           </div>
           <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <span class="badge" style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; font-size: 0.72rem; font-weight: 600;">
-              Deterministic Mode Active
+            <span class="badge" id="ai-mode-badge" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-size: 0.72rem; font-weight: 600;">
+              Optional
             </span>
           </div>
         </div>
@@ -245,49 +245,49 @@
           <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem;">
             <div style="flex: 1; min-width: 260px;">
               <label for="select-local-model" style="font-size: 0.78rem; font-weight: 600; color: #334155; display: block; margin-bottom: 0.25rem;">
-                Select Instruct Model:
+                Writing Assistant Model:
               </label>
               <select id="select-local-model" class="form-control" style="font-size: 0.82rem; padding: 0.4rem 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; width: 100%; background: #ffffff;">
-                <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC" selected>Qwen 2.5 0.5B (~350 MB Download - Recommended)</option>
-                <option value="SmolLM2-360M-Instruct-q4f16_1-MLC">SmolLM2 360M (~230 MB Download - Ultra-Fast)</option>
-                <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama 3.2 1B (~880 MB Download - High Quality)</option>
-                <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">Qwen 2.5 1.5B (~1.3 GB Download - Advanced)</option>
+                <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC" selected>Standard Model (Fast & Balanced — Recommended)</option>
+                <option value="SmolLM2-360M-Instruct-q4f16_1-MLC">Lightweight Model (Quick Download — For Laptops & Tablets)</option>
+                <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Advanced Model (In-Depth Academic Phrasing)</option>
+                <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">Comprehensive Model (Maximum Synthesis Depth)</option>
               </select>
             </div>
             
             <div style="display: flex; align-items: flex-end; gap: 0.5rem;">
               <button class="btn btn-primary" id="btn-init-local-ai" style="padding: 0.5rem 1.25rem; font-size: 0.85rem; font-weight: 600; background: linear-gradient(135deg, #4f46e5, #6366f1); border: none;">
-                Enable Local AI
+                Enable AI Assistant
               </button>
               <button class="btn btn-secondary btn-sm" id="btn-unload-local-ai" style="display: none; padding: 0.5rem 1rem; font-size: 0.82rem;">
-                Free Memory
+                Disable AI
               </button>
             </div>
           </div>
 
           <!-- Explanatory Notice -->
           <div id="local-ai-info-notice" style="font-size: 0.78rem; color: #64748b; margin-top: 0.6rem; line-height: 1.4;">
-            <strong>Privacy & Performance Disclosure:</strong> Model weights download directly into your browser's Cache API on first run and execute entirely on your device using WebGPU. No research datasets, variables, or prompts are ever uploaded to external servers. If WebGPU is unavailable or local AI is not initialized, ResAI operates deterministically with 100% functionality.
+            <strong>Privacy Guarantee:</strong> When enabled, the model runs strictly inside your web browser. Your datasets, variables, and report text never leave your computer. If AI is not enabled, ResAI generates complete, publication-ready reports using standard template matching.
           </div>
 
           <!-- Download / Load Progress Bar (Hidden by default) -->
           <div id="local-ai-progress-container" style="display: none; margin-top: 0.85rem; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.85rem 1rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
-              <span id="local-ai-progress-text" style="font-size: 0.82rem; font-weight: 600; color: #1e40af;">Preparing local runtime...</span>
+              <span id="local-ai-progress-text" style="font-size: 0.82rem; font-weight: 600; color: #1e40af;">Preparing writing assistant...</span>
               <span id="local-ai-progress-percent" style="font-size: 0.82rem; font-weight: 700; color: #1d4ed8;">0%</span>
             </div>
             <div style="width: 100%; height: 8px; background: #dbeafe; border-radius: 4px; overflow: hidden;">
               <div id="local-ai-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #3b82f6, #6366f1); border-radius: 4px; transition: width 0.25s ease;"></div>
             </div>
             <div style="font-size: 0.72rem; color: #60a5fa; margin-top: 0.35rem;">
-              Inference runs on your GPU. Download happens once; cached weights reload instantly on subsequent visits.
+              Model setup occurs once; files are cached on your device for instant use on future visits.
             </div>
           </div>
 
           <!-- Compatibility Warning Box (Hidden by default, shown if WebGPU is absent) -->
-          <div id="local-ai-incompatible-box" style="display: none; margin-top: 0.85rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.8rem; color: #92400e;">
-            <strong>WebGPU Hardware Acceleration Unavailable:</strong> <span id="local-ai-incompatible-reason">Your browser does not have WebGPU enabled.</span><br>
-            <span style="color: #78350f;">ResAI will automatically use its deterministic workflow engine for template interpretation, statistical computations, and academic manuscript assembly. Zero features are blocked.</span>
+          <div id="local-ai-incompatible-box" style="display: none; margin-top: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.8rem; color: #475569;">
+            <strong>Standard Mode Active:</strong> <span id="local-ai-incompatible-reason">Your browser will generate reports using the built-in research engine.</span><br>
+            <span style="color: #64748b;">All statistical analysis, data tables, and manuscript assembly work normally. No setup is required.</span>
           </div>
         </div>
       </div>

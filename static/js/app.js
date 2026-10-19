@@ -548,9 +548,10 @@ async function initLocalAIListeners() {
   // 1. Initial WebGPU hardware compatibility check
   try {
     const compat = await window.ResAILocalLLM.checkWebGPUCompatibility();
+    const modeBadge = document.getElementById("ai-mode-badge");
     if (compat.supported) {
       if (statusBadge) {
-        statusBadge.textContent = "WebGPU Available (Local AI Supported)";
+        statusBadge.textContent = "AI Available";
         statusBadge.style.background = "#eff6ff";
         statusBadge.style.color = "#1e40af";
         statusBadge.style.border = "1px solid #bfdbfe";
@@ -558,16 +559,19 @@ async function initLocalAIListeners() {
       if (initBtn) initBtn.disabled = false;
     } else {
       if (statusBadge) {
-        statusBadge.textContent = "WebGPU Incompatible (Deterministic Mode Active)";
-        statusBadge.style.background = "#fffbeb";
-        statusBadge.style.color = "#92400e";
-        statusBadge.style.border = "1px solid #fde68a";
+        statusBadge.textContent = "Standard Mode";
+        statusBadge.style.background = "#f1f5f9";
+        statusBadge.style.color = "#475569";
+        statusBadge.style.border = "1px solid #cbd5e1";
+      }
+      if (modeBadge) {
+        modeBadge.textContent = "Standard";
       }
       if (incompatibleBox) incompatibleBox.style.display = "block";
-      if (incompatibleReason) incompatibleReason.textContent = compat.reason;
+      if (incompatibleReason) incompatibleReason.textContent = "Your browser will generate reports using the built-in research engine.";
       if (initBtn) {
         initBtn.disabled = true;
-        initBtn.title = "WebGPU not supported in this browser. Deterministic engine active.";
+        initBtn.title = "Standard research reporting engine active.";
       }
     }
   } catch (err) {
@@ -579,18 +583,19 @@ async function initLocalAIListeners() {
     const chosenModel = modelSelect ? modelSelect.value : "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
     const modelMeta = window.ResAILocalLLM.getSupportedModels().find(m => m.id === chosenModel);
     const sizeMb = modelMeta ? modelMeta.downloadSizeMB : 350;
+    const modeBadge = document.getElementById("ai-mode-badge");
 
     initBtn.disabled = true;
     if (modelSelect) modelSelect.disabled = true;
     if (progressContainer) progressContainer.style.display = "block";
     if (statusBadge) {
-      statusBadge.textContent = `Downloading ${chosenModel.split("-")[0]} (~${sizeMb} MB)...`;
+      statusBadge.textContent = `Preparing Assistant (~${sizeMb} MB)...`;
       statusBadge.style.background = "#eff6ff";
       statusBadge.style.color = "#1d4ed8";
     }
 
     try {
-      showToast(`Initializing ${modelMeta?.name || 'Local AI'} (~${sizeMb} MB download on first run)...`, "info");
+      showToast(`Setting up AI assistant (~${sizeMb} MB download on first run)...`, "info");
 
       await window.ResAILocalLLM.initModel(chosenModel, (progress) => {
         if (progressBar) progressBar.style.width = `${progress.percent}%`;
@@ -599,10 +604,16 @@ async function initLocalAIListeners() {
       });
 
       if (statusBadge) {
-        statusBadge.textContent = `Local AI Ready: ${modelMeta?.name || 'Active'}`;
+        statusBadge.textContent = "AI Assistant Active";
         statusBadge.style.background = "#ecfdf5";
         statusBadge.style.color = "#065f46";
         statusBadge.style.border = "1px solid #a7f3d0";
+      }
+      if (modeBadge) {
+        modeBadge.textContent = "AI Enhanced";
+        modeBadge.style.background = "#ecfdf5";
+        modeBadge.style.color = "#065f46";
+        modeBadge.style.border = "1px solid #a7f3d0";
       }
 
       initBtn.style.display = "none";
@@ -613,7 +624,7 @@ async function initLocalAIListeners() {
         }, 1500);
       }
 
-      showToast(`Local LLM (${modelMeta?.name}) is ready. Inference runs 100% locally on your GPU.`, "success");
+      showToast(`AI writing assistant is ready. Everything runs 100% locally on your computer.`, "success");
 
       // If dataset & template are already loaded, re-run template interpretation with local LLM
       if (window.ResAIWorkflowEngine && window.ResAIWorkflowEngine.templateJSON && window.ResAIWorkflowEngine.profileJSON) {
@@ -636,12 +647,12 @@ async function initLocalAIListeners() {
       }
     } catch (err) {
       console.error("Local LLM load failure:", err);
-      showToast(`Failed to initialize local LLM: ${err.message}. Reverting to deterministic mode.`, "danger");
+      showToast(`Failed to initialize AI assistant: ${err.message}. Using standard reporting mode.`, "danger");
       if (statusBadge) {
-        statusBadge.textContent = "Initialization Failed (Deterministic Fallback)";
-        statusBadge.style.background = "#fef2f2";
-        statusBadge.style.color = "#b91c1c";
-        statusBadge.style.border = "1px solid #fecaca";
+        statusBadge.textContent = "Standard Mode";
+        statusBadge.style.background = "#f1f5f9";
+        statusBadge.style.color = "#475569";
+        statusBadge.style.border = "1px solid #cbd5e1";
       }
       initBtn.disabled = false;
       if (modelSelect) modelSelect.disabled = false;
@@ -653,11 +664,18 @@ async function initLocalAIListeners() {
   unloadBtn?.addEventListener("click", async () => {
     try {
       await window.ResAILocalLLM.unloadModel();
+      const modeBadge = document.getElementById("ai-mode-badge");
       if (statusBadge) {
-        statusBadge.textContent = "WebGPU Available (Local AI Supported)";
+        statusBadge.textContent = "AI Available";
         statusBadge.style.background = "#eff6ff";
         statusBadge.style.color = "#1e40af";
         statusBadge.style.border = "1px solid #bfdbfe";
+      }
+      if (modeBadge) {
+        modeBadge.textContent = "Optional";
+        modeBadge.style.background = "#f1f5f9";
+        modeBadge.style.color = "#475569";
+        modeBadge.style.border = "1px solid #cbd5e1";
       }
       if (initBtn) {
         initBtn.disabled = false;
@@ -665,9 +683,9 @@ async function initLocalAIListeners() {
       }
       if (modelSelect) modelSelect.disabled = false;
       if (unloadBtn) unloadBtn.style.display = "none";
-      showToast("Local LLM unloaded from GPU memory.", "info");
+      showToast("AI assistant disabled. Standard reporting mode active.", "info");
     } catch (err) {
-      showToast(`Error unloading model: ${err.message}`, "warning");
+      showToast(`Error disabling AI: ${err.message}`, "warning");
     }
   });
 }

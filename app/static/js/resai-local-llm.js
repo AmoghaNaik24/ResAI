@@ -65,7 +65,7 @@
      */
     async checkWebGPUCompatibility() {
       // Node.js test environment check
-      if (typeof window === "undefined" || typeof navigator === "undefined") {
+      if (typeof window === "undefined" || typeof navigator === "undefined" || (typeof process !== "undefined" && process.versions && process.versions.node)) {
         return {
           supported: true,
           isNode: true,
@@ -128,7 +128,7 @@
     async _loadWebLLMModule() {
       if (this.webllmModule) return this.webllmModule;
 
-      if (typeof window === "undefined") {
+      if (typeof window === "undefined" || (typeof process !== "undefined" && process.versions && process.versions.node)) {
         // Node.js fallback or mock
         this.isMock = true;
         this.webllmModule = {

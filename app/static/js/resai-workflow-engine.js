@@ -596,18 +596,18 @@
       if (!heading || typeof heading !== "string") return "general_narrative";
       const h = heading.trim().toLowerCase();
 
-      if (/^(\d+[\.\)]\s*)?(abstract|executive\s+summary)/i.test(h)) return "abstract";
+      if (/(abstract|executive\s+summary)/i.test(h)) return "abstract";
       if (/title\s*page|front\s*matter|cover\s*page|^title$/i.test(h)) return "title_page";
-      if (/^(\d+[\.\)]\s*)?(literature\s*review|related\s*work|scholarly\s*sources|theoretical\s*framework)/i.test(h)) return "literature_review";
-      if (/cohort\s*(comparison|difference)|subgroup\s*analysis|between\s*group|treatment\s*vs\s*control/i.test(h)) return "cohort_comparison";
-      if (/^(\d+[\.\)]\s*)?(introduction|background|problem\s*statement)/i.test(h)) return "introduction";
-      if (/^(\d+[\.\)]\s*)?(methodology|methods|procedure|empirical\s*approach|materials|data\s*collection)/i.test(h)) return "methodology";
-      if (/^(\d+[\.\)]\s*)?(results|findings|statistical\s*analysis|quantitative\s*findings)/i.test(h)) return "analytical_results";
-      if (/^(\d+[\.\)]\s*)?(discussion|implications|interpretation)/i.test(h)) return "discussion";
-      if (/^(\d+[\.\)]\s*)?(limitations|threats\s*to\s*validity)/i.test(h)) return "limitations";
-      if (/^(\d+[\.\)]\s*)?(conclusion|summary\s*of\s*findings|concluding\s*remarks)/i.test(h)) return "conclusion";
-      if (/^(\d+[\.\)]\s*)?(references|works\s*cited|bibliography)/i.test(h)) return "references";
-      if (/guideline|formatting\s*(advice|notes|instructions)|template\s*notes|how\s*to\s*use/i.test(h)) return "formatting_guidance";
+      if (/(literature\s*review|related\s*work|scholarly\s*sources|theoretical\s*framework)/i.test(h)) return "literature_review";
+      if (/(cohort|subgroup|between[\s-]group|treatment|clinical|placebo)/i.test(h)) return "cohort_comparison";
+      if (/(results|findings|statistical\s*analysis|quantitative\s*findings|empirical\s*findings)/i.test(h)) return "analytical_results";
+      if (/(introduction|background|problem\s*statement|context\b|scope\b)/i.test(h)) return "introduction";
+      if (/(methodology|methods\b|procedure|empirical\s*approach|materials|data\s*collection)/i.test(h)) return "methodology";
+      if (/(discussion|implications|interpretation|recommendations|strategic)/i.test(h)) return "discussion";
+      if (/(limitations|threats\s*to\s*validity)/i.test(h)) return "limitations";
+      if (/(conclusion|summary\s*of\s*findings|concluding\s*remarks)/i.test(h)) return "conclusion";
+      if (/(references|works\s*cited|bibliography)/i.test(h)) return "references";
+      if (/guideline|formatting\s*(advice|notes|instructions|rules)|template\s*notes|how\s*to\s*use|style\s*rules/i.test(h)) return "formatting_guidance";
 
       return "general_narrative";
     }
@@ -740,9 +740,21 @@
             break;
 
           case "cohort_comparison":
-            if (!hasGrouping) {
+            // Check if section demands specific treatment/control or clinical concepts not present in dataset
+            const isClinicalOrTreatment = /clinical|placebo|patient|drug|hospital|treatment\s*vs\s*control/i.test(heading) ||
+              (sec.paragraphs || []).some(p => /clinical|placebo|patient|drug|hospital|treatment\s*(vs|versus)\s*control/i.test(p));
+            
+            // Check if dataset has treatment/control or clinical variables
+            const hasClinicalOrTreatmentVars = columns.some(c => 
+              /treatment|control|placebo|patient|drug|hospital/i.test(c.name) ||
+              (c.categories && c.categories.some(cat => /treatment|control|placebo/i.test(String(cat))))
+            );
+
+            if (!hasGrouping || (isClinicalOrTreatment && !hasClinicalOrTreatmentVars)) {
               decision = "omit";
-              reason = "Section requires categorical grouping cohorts, but input dataset lacks a valid grouping factor. Eliminated to prevent ungrounded claims.";
+              reason = isClinicalOrTreatment && !hasClinicalOrTreatmentVars
+                ? "Section requires clinical or treatment-vs-control cohort data, which is absent from the input dataset profile. Eliminated to prevent ungrounded claims."
+                : "Section requires categorical grouping cohorts, but input dataset lacks a valid grouping factor. Eliminated to prevent ungrounded claims.";
               status = "omitted";
               isRequired = false;
             } else {
@@ -799,8 +811,14 @@
             break;
 
           default:
+            const isMismatchedDomain = /clinical|placebo|patient|hospital|biomarker/i.test(heading) && !columns.some(c => /patient|clinical|hospital|biomarker/i.test(c.name));
             const nonInstructionParas = (sec.paragraphs || []).filter(p => !this.isInstructionOrExampleParagraph(p));
-            if (nonInstructionParas.length === 0 && (sec.paragraphs || []).length > 0) {
+            if (isMismatchedDomain) {
+              decision = "omit";
+              reason = "Section domain (clinical/biomedical) does not match the uploaded dataset variables. Eliminated to preserve empirical integrity.";
+              status = "omitted";
+              isRequired = false;
+            } else if (nonInstructionParas.length === 0 && (sec.paragraphs || []).length > 0) {
               decision = "omit";
               reason = "Section contains exclusively instructional boilerplate or template author guidance.";
               status = "omitted";
