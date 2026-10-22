@@ -66,8 +66,9 @@ class DatasetQA:
         if data_ans:
             return data_ans
 
-        # 3. LLM Grounded Synthesis (if configured)
-        if (DEFAULT_LLM_PROVIDER in ["openai", "gemini", "ollama"]) and (OPENAI_API_KEY or GEMINI_API_KEY or DEFAULT_LLM_PROVIDER == "ollama"):
+        # 3. LLM Grounded Synthesis (if configured with valid key)
+        has_real_key = (GEMINI_API_KEY and GEMINI_API_KEY != "YOUR_GEMINI_API_KEY_HERE") or bool(OPENAI_API_KEY)
+        if (DEFAULT_LLM_PROVIDER in ["openai", "gemini"]) and has_real_key:
             try:
                 llm_ans = DatasetQA._query_llm_grounded(q, df, profile, statistical_results, research_objective)
                 if llm_ans:
@@ -608,16 +609,37 @@ class DatasetQA:
             f"Do not hallucinate or speculate."
         )
 
+        # Check domain relevance to eliminate off-topic hallucinations
+        cols = [c.lower() for c in (df.columns.tolist() if df is not None else [])]
+        q_lower = query.lower()
+        is_domain_relevant = any(c in q_lower for c in cols) or any(
+            k in q_lower for k in [
+                "dataset", "sample", "data", "row", "column", "stat", "mean", "test",
+                "p-value", "variable", "summary", "objective", "inquiry", "hygiene",
+                "distribution", "anova", "correlation", "regression", "finding", "describe"
+            ]
+        )
+        if not is_domain_relevant:
+            return {
+                "answer": DatasetQA.KNOWLEDGE_LIMITED_MSG,
+                "source": "RAG Guardrail (Dataset Grounded)",
+                "grounded": False
+            }
+
         # Call LLM service
         import asyncio
-        loop = asyncio.get_event_loop()
-        ans = loop.run_until_complete(
-            LLMService.generate_academic_text(prompt=prompt, context=context)
-        )
+        try:
+            loop = asyncio.get_running_loop()
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                ans = pool.submit(asyncio.run, LLMService.generate_academic_text(prompt=prompt, context=context)).result()
+        except RuntimeError:
+            ans = asyncio.run(LLMService.generate_academic_text(prompt=prompt, context=context))
         if ans and ans.strip():
+            is_refusal = (DatasetQA.KNOWLEDGE_LIMITED_MSG.lower() in ans.lower()) or ("knowledge is limited" in ans.lower()) or ("cannot be answered" in ans.lower())
             return {
-                "answer": ans.strip(),
-                "source": "LLM Synthesis (Grounded in Dataset)",
-                "grounded": True
+                "answer": ans.strip() if not is_refusal else DatasetQA.KNOWLEDGE_LIMITED_MSG,
+                "source": "LLM Synthesis (Grounded in Dataset)" if not is_refusal else "RAG Guardrail (Dataset Grounded)",
+                "grounded": not is_refusal
             }
         return None

@@ -5,6 +5,7 @@ from typing import Optional, List, Dict, Any
 from pathlib import Path
 import json
 import datetime
+import pandas as pd
 from app.api.eda import ACTIVE_DATASET
 from app.core.eda_profiler import EDAProfiler
 from app.core.statistical_engine import StatisticalEngine
@@ -13,7 +14,8 @@ from app.core.rag_engine import rag_engine
 from app.core.claim_validator import ClaimValidator
 from app.core.llm_service import LLMService
 from app.core.docx_template_engine import DocxTemplateEngine
-from app.config import REPORTS_DIR, UPLOAD_DIR
+from app.core.adaptive_report_engine import AdaptiveReportEngine
+from app.config import REPORTS_DIR, UPLOAD_DIR, GEMINI_API_KEY
 
 router = APIRouter(prefix="/api/report", tags=["Academic Report Generation & Human Validation"])
 
@@ -73,71 +75,65 @@ class GenerateReportRequest(BaseModel):
     selected_tests: Optional[List[Dict[str, Any]]] = None
     custom_notes: Optional[str] = ""
     attached_charts: Optional[List[Dict[str, Any]]] = None
+    data_rows: Optional[List[Dict[str, Any]]] = None
+    filename: Optional[str] = None
+    objective: Optional[str] = None
 
 
 @router.post("/generate")
 async def generate_draft_report(req: GenerateReportRequest):
     df = ACTIVE_DATASET.get("df")
+    if df is None and req.data_rows and len(req.data_rows) > 0:
+        df = pd.DataFrame(req.data_rows)
+        ACTIVE_DATASET["df"] = df
+        ACTIVE_DATASET["filename"] = req.filename or "Uploaded Research Dataset"
+        ACTIVE_DATASET["objective"] = req.objective or "Quantitative Research Evaluation"
+
     if df is None:
         raise HTTPException(status_code=400, detail="No active dataset loaded.")
 
-    objective = ACTIVE_DATASET.get("objective", "Quantitative Research Evaluation")
+    objective = req.objective or ACTIVE_DATASET.get("objective") or "Quantitative Research Evaluation"
     eda_summary = EDAProfiler.profile_dataset(df)
-    eda_summary["filename"] = ACTIVE_DATASET.get("filename") or "Uploaded Research Dataset"
+    eda_summary["filename"] = req.filename or ACTIVE_DATASET.get("filename") or "Uploaded Research Dataset"
 
-    # If user provided specific tests, use them; otherwise automatically compute recommended tests
-    computed_tests = []
-    if req.selected_tests and len(req.selected_tests) > 0:
-        for t in req.selected_tests:
-            t_type = t.get("test")
-            p = t.get("params", {})
-            try:
-                if t_type == "two_sample_test":
-                    res = StatisticalEngine.two_sample_test(df, p["continuous_col"], p["group_col"])
-                elif t_type == "anova_test":
-                    res = StatisticalEngine.anova_test(df, p["continuous_col"], p["group_col"])
-                elif t_type == "chi_square_test":
-                    res = StatisticalEngine.chi_square_test(df, p["var1"], p["var2"])
-                elif t_type == "linear_regression":
-                    res = StatisticalEngine.linear_regression(df, p["target_col"], p["feature_cols"])
-                elif t_type == "correlation_analysis":
-                    res = StatisticalEngine.calculate_correlations(df, p.get("method", "pearson"))
-                else:
-                    res = None
-
-                if res and "error" not in res:
-                    computed_tests.append(res)
-            except Exception:
-                pass
-
-    # If no tests were provided or computed, run automated recommendations
-    if not computed_tests:
-        recs = StatisticalEngine.auto_recommend_analysis(df, objective)
-        for r in recs[:3]:
-            t_type = r.get("test")
-            p = r.get("params", {})
-            try:
-                if t_type == "two_sample_test":
-                    res = StatisticalEngine.two_sample_test(df, p["continuous_col"], p["group_col"])
-                elif t_type == "anova_test":
-                    res = StatisticalEngine.anova_test(df, p["continuous_col"], p["group_col"])
-                elif t_type == "linear_regression":
-                    res = StatisticalEngine.linear_regression(df, p["target_col"], p["feature_cols"])
-                elif t_type == "correlation_analysis":
-                    res = StatisticalEngine.calculate_correlations(df, p.get("method", "pearson"))
-                elif t_type == "chi_square_test":
-                    res = StatisticalEngine.chi_square_test(df, p["var1"], p["var2"])
-                else:
-                    res = None
-
-                if res and "error" not in res:
-                    computed_tests.append(res)
-            except Exception:
-                pass
+    # Compute statistical tests
+    computed_tests = _compute_statistical_tests(df, objective, req.selected_tests)
 
     # Retrieve relevant RAG guidelines
     rag_context = rag_engine.retrieve_relevant_context(objective + " APA reporting")
 
+    # Determine template content for adaptive reasoning
+    template_content = req.custom_template_content or ""
+    template_name = req.template_name or req.professor_template or "Standard Empirical Research Report"
+    if not template_content:
+        all_tpls = ReportGenerator.get_templates()
+        matched = next((t for t in all_tpls if t.get("name") == template_name or t.get("id") == template_name), None)
+        if matched:
+            template_content = matched.get("content", "")
+
+    # Use ADAPTIVE Gemini pipeline if API key is configured
+    has_gemini = bool(GEMINI_API_KEY and GEMINI_API_KEY.strip() and GEMINI_API_KEY != "YOUR_GEMINI_API_KEY_HERE")
+    if has_gemini:
+        try:
+            report_data = await AdaptiveReportEngine.generate_adaptive_report(
+                df=df,
+                eda_summary=eda_summary,
+                statistical_results=computed_tests,
+                rag_context=rag_context,
+                research_objective=objective,
+                researcher_name=req.researcher_name or "Lead Researcher",
+                template_content=template_content,
+                template_name=template_name,
+                human_notes=req.custom_notes or "",
+                attached_charts=req.attached_charts,
+                title=req.title or ""
+            )
+            CURRENT_REPORT["data"] = report_data
+            return report_data
+        except Exception as e:
+            print(f"[ResAI] Adaptive pipeline error, falling back to standard: {e}")
+
+    # Fallback: Standard template-based report
     report_data = ReportGenerator.construct_academic_report(
         title=req.title,
         research_objective=objective,
@@ -145,7 +141,7 @@ async def generate_draft_report(req: GenerateReportRequest):
         statistical_results=computed_tests,
         rag_context=rag_context,
         researcher_name=req.researcher_name,
-        professor_template=req.template_name or req.professor_template,
+        professor_template=template_name,
         human_notes=req.custom_notes,
         attached_charts=req.attached_charts,
         custom_template_content=req.custom_template_content,
@@ -154,6 +150,48 @@ async def generate_draft_report(req: GenerateReportRequest):
 
     CURRENT_REPORT["data"] = report_data
     return report_data
+
+
+def _compute_statistical_tests(df, objective: str, selected_tests=None) -> list:
+    """Computes statistical tests from user selections or auto-recommendations."""
+    computed = []
+    if selected_tests and len(selected_tests) > 0:
+        for t in selected_tests:
+            t_type = t.get("test")
+            p = t.get("params", {})
+            try:
+                res = _run_single_test(df, t_type, p)
+                if res and "error" not in res:
+                    computed.append(res)
+            except Exception:
+                pass
+
+    if not computed:
+        recs = StatisticalEngine.auto_recommend_analysis(df, objective)
+        for r in recs[:3]:
+            try:
+                res = _run_single_test(df, r.get("test"), r.get("params", {}))
+                if res and "error" not in res:
+                    computed.append(res)
+            except Exception:
+                pass
+
+    return computed
+
+
+def _run_single_test(df, t_type: str, params: dict):
+    """Runs a single statistical test and returns the result."""
+    if t_type == "two_sample_test":
+        return StatisticalEngine.two_sample_test(df, params["continuous_col"], params["group_col"])
+    elif t_type == "anova_test":
+        return StatisticalEngine.anova_test(df, params["continuous_col"], params["group_col"])
+    elif t_type == "chi_square_test":
+        return StatisticalEngine.chi_square_test(df, params["var1"], params["var2"])
+    elif t_type == "linear_regression":
+        return StatisticalEngine.linear_regression(df, params["target_col"], params["feature_cols"])
+    elif t_type == "correlation_analysis":
+        return StatisticalEngine.calculate_correlations(df, params.get("method", "pearson"))
+    return None
 
 
 
@@ -181,7 +219,25 @@ async def run_auto_pipeline(req: Optional[AutoPipelineRequest] = None):
         "status": "success",
         "message": "Automated pipeline executed successfully.",
         "report": report_data,
+        "is_adaptive": report_data.get("is_adaptive", False),
+        "domain_detected": report_data.get("domain_detected", ""),
         "executed_tests": report_data.get("results", [])
+    }
+
+
+@router.get("/adaptive-plan")
+async def get_adaptive_plan():
+    """Returns the adaptive report plan from the last generated report."""
+    if CURRENT_REPORT["data"] is None:
+        return {"status": "empty", "message": "No report generated yet."}
+    plan = CURRENT_REPORT["data"].get("adaptive_plan")
+    validation = CURRENT_REPORT["data"].get("llm_validation")
+    return {
+        "status": "success",
+        "is_adaptive": CURRENT_REPORT["data"].get("is_adaptive", False),
+        "domain_detected": CURRENT_REPORT["data"].get("domain_detected", ""),
+        "plan": plan,
+        "validation": validation
     }
 
 
@@ -246,7 +302,7 @@ async def export_markdown():
         raise HTTPException(status_code=400, detail="No active draft report to export.")
 
     r = CURRENT_REPORT["data"]
-    if r.get("is_custom_template") and r.get("rendered_content"):
+    if (r.get("is_custom_template") or r.get("is_adaptive")) and r.get("rendered_content"):
         return Response(
             content=r.get("rendered_content"),
             media_type="text/markdown",
@@ -372,9 +428,39 @@ async def export_html():
 
 @router.get("/llm-status")
 async def get_llm_status():
-    """Detects available local Ollama models and operational readiness."""
+    """Returns Gemini AI intelligence layer status and configuration."""
     status = await LLMService.get_ollama_status()
+    gemini_cfg = LLMService.get_gemini_config()
+    status["gemini"] = gemini_cfg
     return status
+
+
+@router.get("/gemini-config")
+async def get_gemini_config():
+    """Returns current Gemini API configuration (key masked)."""
+    return LLMService.get_gemini_config()
+
+
+class GeminiInterpretRequest(BaseModel):
+    prompt: str
+    statistical_schema: Dict[str, Any]
+    model: Optional[str] = None
+
+
+@router.post("/gemini-interpret")
+async def gemini_interpret(req: GeminiInterpretRequest):
+    """Executes Gemini grounded narrative synthesis for the given prompt and facts."""
+    interpretation = await LLMService.generate_grounded_interpretation(
+        prompt=req.prompt,
+        statistical_schema=req.statistical_schema,
+        provider="gemini",
+        model=req.model
+    )
+    return {
+        "status": "success",
+        "interpretation": interpretation,
+        "engine": "gemini" if LLMService.get_gemini_config()["available"] else "deterministic"
+    }
 
 
 class ValidateClaimsRequest(BaseModel):

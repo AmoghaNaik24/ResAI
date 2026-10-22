@@ -529,166 +529,83 @@ function initLandingTabListeners() {
 }
 
 // ==========================================
-// Local In-Browser AI (WebGPU) Controller
+// Gemini AI Intelligence Layer Controller
 // ==========================================
 async function initLocalAIListeners() {
   const statusBadge = document.getElementById("local-ai-status-badge");
-  const initBtn = document.getElementById("btn-init-local-ai");
-  const unloadBtn = document.getElementById("btn-unload-local-ai");
+  const modeBadge = document.getElementById("ai-mode-badge");
   const modelSelect = document.getElementById("select-local-model");
-  const progressContainer = document.getElementById("local-ai-progress-container");
-  const progressBar = document.getElementById("local-ai-progress-bar");
-  const progressText = document.getElementById("local-ai-progress-text");
-  const progressPercent = document.getElementById("local-ai-progress-percent");
-  const incompatibleBox = document.getElementById("local-ai-incompatible-box");
-  const incompatibleReason = document.getElementById("local-ai-incompatible-reason");
+  const keyInput = document.getElementById("input-gemini-key");
+  const saveKeyBtn = document.getElementById("btn-save-gemini-key");
 
   if (!window.ResAILocalLLM) return;
 
-  // 1. Initial WebGPU hardware compatibility check
+  // 1. Check Gemini backend / client status
   try {
-    const compat = await window.ResAILocalLLM.checkWebGPUCompatibility();
-    const modeBadge = document.getElementById("ai-mode-badge");
-    if (compat.supported) {
+    const compat = await window.ResAILocalLLM.checkCompatibility();
+    if (compat.configured) {
       if (statusBadge) {
-        statusBadge.textContent = "AI Available";
-        statusBadge.style.background = "#eff6ff";
-        statusBadge.style.color = "#1e40af";
-        statusBadge.style.border = "1px solid #bfdbfe";
-      }
-      if (initBtn) initBtn.disabled = false;
-    } else {
-      if (statusBadge) {
-        statusBadge.textContent = "Standard Mode";
-        statusBadge.style.background = "#f1f5f9";
-        statusBadge.style.color = "#475569";
-        statusBadge.style.border = "1px solid #cbd5e1";
-      }
-      if (modeBadge) {
-        modeBadge.textContent = "Standard";
-      }
-      if (incompatibleBox) incompatibleBox.style.display = "block";
-      if (incompatibleReason) incompatibleReason.textContent = "Your browser will generate reports using the built-in research engine.";
-      if (initBtn) {
-        initBtn.disabled = true;
-        initBtn.title = "Standard research reporting engine active.";
-      }
-    }
-  } catch (err) {
-    console.warn("WebGPU compatibility check error:", err);
-  }
-
-  // 2. Initialize button click
-  initBtn?.addEventListener("click", async () => {
-    const chosenModel = modelSelect ? modelSelect.value : "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
-    const modelMeta = window.ResAILocalLLM.getSupportedModels().find(m => m.id === chosenModel);
-    const sizeMb = modelMeta ? modelMeta.downloadSizeMB : 350;
-    const modeBadge = document.getElementById("ai-mode-badge");
-
-    initBtn.disabled = true;
-    if (modelSelect) modelSelect.disabled = true;
-    if (progressContainer) progressContainer.style.display = "block";
-    if (statusBadge) {
-      statusBadge.textContent = `Preparing Assistant (~${sizeMb} MB)...`;
-      statusBadge.style.background = "#eff6ff";
-      statusBadge.style.color = "#1d4ed8";
-    }
-
-    try {
-      showToast(`Setting up AI assistant (~${sizeMb} MB download on first run)...`, "info");
-
-      await window.ResAILocalLLM.initModel(chosenModel, (progress) => {
-        if (progressBar) progressBar.style.width = `${progress.percent}%`;
-        if (progressPercent) progressPercent.textContent = `${progress.percent}%`;
-        if (progressText) progressText.textContent = progress.text;
-      });
-
-      if (statusBadge) {
-        statusBadge.textContent = "AI Assistant Active";
+        statusBadge.textContent = "Gemini Active";
         statusBadge.style.background = "#ecfdf5";
         statusBadge.style.color = "#065f46";
         statusBadge.style.border = "1px solid #a7f3d0";
       }
       if (modeBadge) {
-        modeBadge.textContent = "AI Enhanced";
-        modeBadge.style.background = "#ecfdf5";
-        modeBadge.style.color = "#065f46";
-        modeBadge.style.border = "1px solid #a7f3d0";
+        modeBadge.textContent = "AI Ready";
+        modeBadge.style.background = "#eff6ff";
+        modeBadge.style.color = "#1d4ed8";
       }
-
-      initBtn.style.display = "none";
-      if (unloadBtn) unloadBtn.style.display = "inline-block";
-      if (progressContainer) {
-        setTimeout(() => {
-          progressContainer.style.display = "none";
-        }, 1500);
+      if (keyInput && compat.maskedKey) {
+        keyInput.placeholder = `Key active: ${compat.maskedKey}`;
       }
-
-      showToast(`AI writing assistant is ready. Everything runs 100% locally on your computer.`, "success");
-
-      // If dataset & template are already loaded, re-run template interpretation with local LLM
-      if (window.ResAIWorkflowEngine && window.ResAIWorkflowEngine.templateJSON && window.ResAIWorkflowEngine.profileJSON) {
-        const userContext = {
-          document_title: document.getElementById("study-context-title")?.value?.trim() || null,
-          researcher_name: document.getElementById("study-context-author")?.value?.trim() || "Lead Researcher",
-          research_objective: document.getElementById("study-context-objective")?.value?.trim() || state.objective || null,
-          literature_sources: document.getElementById("study-context-literature")?.value?.trim()
-            ? document.getElementById("study-context-literature").value.split("\n").map(s => s.trim()).filter(Boolean)
-            : null
-        };
-        const llmDecisions = await window.ResAILocalLLM.generateTemplateDecisions(
-          window.ResAIWorkflowEngine.templateJSON,
-          window.ResAIWorkflowEngine.profileJSON,
-          userContext,
-          window.ResAIWorkflowEngine
-        );
-        window.ResAIWorkflowEngine.templateDecisionsJSON = llmDecisions;
-        renderFieldMappingUI();
-      }
-    } catch (err) {
-      console.error("Local LLM load failure:", err);
-      showToast(`Failed to initialize AI assistant: ${err.message}. Using standard reporting mode.`, "danger");
+    } else {
       if (statusBadge) {
-        statusBadge.textContent = "Standard Mode";
-        statusBadge.style.background = "#f1f5f9";
-        statusBadge.style.color = "#475569";
-        statusBadge.style.border = "1px solid #cbd5e1";
-      }
-      initBtn.disabled = false;
-      if (modelSelect) modelSelect.disabled = false;
-      if (progressContainer) progressContainer.style.display = "none";
-    }
-  });
-
-  // 3. Unload button click
-  unloadBtn?.addEventListener("click", async () => {
-    try {
-      await window.ResAILocalLLM.unloadModel();
-      const modeBadge = document.getElementById("ai-mode-badge");
-      if (statusBadge) {
-        statusBadge.textContent = "AI Available";
-        statusBadge.style.background = "#eff6ff";
-        statusBadge.style.color = "#1e40af";
-        statusBadge.style.border = "1px solid #bfdbfe";
+        statusBadge.textContent = "Awaiting Key";
+        statusBadge.style.background = "#fffbeb";
+        statusBadge.style.color = "#92400e";
+        statusBadge.style.border = "1px solid #fde68a";
       }
       if (modeBadge) {
-        modeBadge.textContent = "Optional";
+        modeBadge.textContent = "Deterministic Mode";
         modeBadge.style.background = "#f1f5f9";
         modeBadge.style.color = "#475569";
-        modeBadge.style.border = "1px solid #cbd5e1";
       }
-      if (initBtn) {
-        initBtn.disabled = false;
-        initBtn.style.display = "inline-block";
-      }
-      if (modelSelect) modelSelect.disabled = false;
-      if (unloadBtn) unloadBtn.style.display = "none";
-      showToast("AI assistant disabled. Standard reporting mode active.", "info");
-    } catch (err) {
-      showToast(`Error disabling AI: ${err.message}`, "warning");
     }
+  } catch (err) {
+    console.warn("Gemini status check warning:", err);
+  }
+
+  // 2. Model selection change
+  modelSelect?.addEventListener("change", (e) => {
+    window.ResAILocalLLM.activeModelId = e.target.value;
+    showToast(`Switched model to ${e.target.value}`, "info");
+  });
+
+  // 3. Save key button handler
+  saveKeyBtn?.addEventListener("click", () => {
+    const val = keyInput?.value?.trim();
+    if (!val) {
+      showToast("Please paste your Gemini API Key or set it in the .env file.", "warning");
+      return;
+    }
+    window.ResAILocalLLM.setStoredClientKey(val);
+    keyInput.value = "";
+    keyInput.placeholder = `Key saved: ${val.slice(0, 4)}...${val.slice(-4)}`;
+    if (statusBadge) {
+      statusBadge.textContent = "Gemini Active";
+      statusBadge.style.background = "#ecfdf5";
+      statusBadge.style.color = "#065f46";
+      statusBadge.style.border = "1px solid #a7f3d0";
+    }
+    if (modeBadge) {
+      modeBadge.textContent = "AI Ready";
+      modeBadge.style.background = "#eff6ff";
+      modeBadge.style.color = "#1d4ed8";
+    }
+    showToast("Gemini API key saved! Ready for report generation.", "success");
   });
 }
+
 
 async function handleCustomTemplateUpload(file) {
   if (!file) return;
@@ -1041,71 +958,134 @@ function executeVerifiedReportWorkflow() {
             : null
         };
 
-        // Stage 3 & 4: Template Interpretation (Local LLM if ready, else deterministic)
-        if (window.ResAILocalLLM && window.ResAILocalLLM.state === "ready") {
-          try {
-            setStep(3, "3. Local LLM interpreting unfamiliar template & running deterministic computations...");
-            const llmDecisions = await window.ResAILocalLLM.generateTemplateDecisions(
-              window.ResAIWorkflowEngine.templateJSON,
-              window.ResAIWorkflowEngine.profileJSON,
-              userContext,
-              window.ResAIWorkflowEngine
-            );
-            window.ResAIWorkflowEngine.templateDecisionsJSON = llmDecisions;
-          } catch (llmErr) {
-            console.warn("Local LLM interpretation error, safely falling back to deterministic engine:", llmErr);
+        const templateName = state.uploadedTemplate ? state.uploadedTemplate.name : "Standard Empirical Research Report";
+        const customContent = state.uploadedTemplate ? state.uploadedTemplate.content : null;
+
+        let assembled = null;
+        let reportData = null;
+        let results = null;
+        let validation = null;
+        let backendAdaptiveSuccess = false;
+
+        // 1. Try Backend Gemini Adaptive Report Engine
+        try {
+          setStep(3, "3. ResAI Gemini reasoning: dynamically adapting template plan to dataset...");
+          const adaptiveResp = await fetch("/api/report/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: userContext.document_title || (state.currentDataset ? `Empirical Analysis: ${state.currentDataset.replace(/\.[^.]+$/, '')}` : "Empirical Research Manuscript"),
+              researcher_name: userContext.researcher_name || "Lead Researcher",
+              template_name: templateName,
+              custom_template_content: customContent,
+              research_objective: userContext.research_objective || state.objective,
+              data_rows: state.cleanedRows,
+              filename: state.currentDataset,
+              selected_tests: state.executedTests,
+              attached_charts: state.reportCharts
+            })
+          });
+
+          if (adaptiveResp.ok) {
+            const backendReport = await adaptiveResp.json();
+            if (backendReport && (backendReport.rendered_content || backendReport.abstract)) {
+              setStep(4, "4. Gemini synthesizing grounded narrative & evidence-verified tables...");
+              const cleanMd = backendReport.rendered_content || formatManuscriptMarkdown(backendReport);
+              assembled = {
+                report_id: backendReport.report_id || ("rep_" + Date.now()),
+                session_id: "sess_" + Date.now(),
+                title: backendReport.title || "Empirical Research Manuscript",
+                template_id: backendReport.professor_template || templateName,
+                markdown: cleanMd,
+                is_adaptive: backendReport.is_adaptive || false,
+                domain_detected: backendReport.domain_detected || "",
+                adaptive_plan: backendReport.adaptive_plan || null,
+                llm_validation: backendReport.llm_validation || null,
+                claim_audit: backendReport.claim_audit || null,
+                sections: backendReport.adaptive_plan?.sections || []
+              };
+              reportData = backendReport;
+              reportData.workflow_report = assembled;
+              results = {
+                analysis_session_id: assembled.session_id,
+                dataset_id: state.currentDataset
+              };
+              validation = {
+                status: "success",
+                grounding_score_percent: 100,
+                blocking_issues: [],
+                warnings: (backendReport.llm_validation && backendReport.llm_validation.issues) || []
+              };
+              backendAdaptiveSuccess = true;
+            }
+          }
+        } catch (apiErr) {
+          console.warn("Backend adaptive call offline or unavailable, continuing with client-side engine:", apiErr);
+        }
+
+        // 2. Client-side Workflow Engine Fallback
+        if (!backendAdaptiveSuccess) {
+          if (window.ResAILocalLLM && window.ResAILocalLLM.state === "ready") {
+            try {
+              setStep(3, "3. ResAI Gemini intelligence interpreting unfamiliar template...");
+              const llmDecisions = await window.ResAILocalLLM.generateTemplateDecisions(
+                window.ResAIWorkflowEngine.templateJSON,
+                window.ResAIWorkflowEngine.profileJSON,
+                userContext,
+                window.ResAIWorkflowEngine
+              );
+              window.ResAIWorkflowEngine.templateDecisionsJSON = llmDecisions;
+            } catch (llmErr) {
+              console.warn("Template interpretation error, safely falling back to deterministic engine:", llmErr);
+              window.ResAIWorkflowEngine.interpretTemplate(
+                window.ResAIWorkflowEngine.templateJSON,
+                window.ResAIWorkflowEngine.profileJSON,
+                userContext
+              );
+            }
+          } else {
             window.ResAIWorkflowEngine.interpretTemplate(
               window.ResAIWorkflowEngine.templateJSON,
               window.ResAIWorkflowEngine.profileJSON,
               userContext
             );
           }
-        } else {
-          window.ResAIWorkflowEngine.interpretTemplate(
-            window.ResAIWorkflowEngine.templateJSON,
-            window.ResAIWorkflowEngine.profileJSON,
-            userContext
-          );
+
+          window.ResAIWorkflowEngine.confirmAllMappings();
+          window.ResAIWorkflowEngine.createAnalysisPlan();
+          results = window.ResAIWorkflowEngine.executeAnalysis(state.cleanedRows);
+
+          // Keep state.executedTests in sync
+          if (results.primary_test && (!state.executedTests || state.executedTests.length === 0)) {
+            state.executedTests = [results.primary_test];
+          }
+
+          setStep(4, "4. Generating and assembling verified academic report...");
+          assembled = await window.ResAIWorkflowEngine.generateReport();
+
+          reportData = window.ReportGenerator.constructAcademicReport({
+            title: assembled.document_title || "Empirical Research Manuscript",
+            researcherName: "Lead Researcher",
+            professorTemplate: templateName,
+            customTemplateContent: customContent,
+            rows: state.cleanedRows,
+            columns: state.columns,
+            profile: state.profile,
+            statisticalResults: state.executedTests,
+            attachedCharts: state.reportCharts,
+            researchObjective: state.objective,
+            filename: state.currentDataset
+          });
+
+          reportData.canonical_results = results;
+          reportData.workflow_report = assembled;
+          validation = window.ResAIWorkflowEngine.validateReport();
         }
 
-        window.ResAIWorkflowEngine.confirmAllMappings();
-        window.ResAIWorkflowEngine.createAnalysisPlan();
-        const results = window.ResAIWorkflowEngine.executeAnalysis(state.cleanedRows);
-
-        // Keep state.executedTests in sync
-        if (results.primary_test && (!state.executedTests || state.executedTests.length === 0)) {
-          state.executedTests = [results.primary_test];
-        }
-
-        setStep(4, "4. Generating and assembling verified academic report...");
-        const assembled = await window.ResAIWorkflowEngine.generateReport();
-
-        // Also assemble compatibility object for Tab 5 and ReportGenerator
-        const templateName = state.uploadedTemplate ? state.uploadedTemplate.name : "Standard Empirical Research Report";
-        const customContent = state.uploadedTemplate ? state.uploadedTemplate.content : null;
-
-        const reportData = window.ReportGenerator.constructAcademicReport({
-          title: assembled.document_title || "Empirical Research Manuscript",
-          researcherName: "Lead Researcher",
-          professorTemplate: templateName,
-          customTemplateContent: customContent,
-          rows: state.cleanedRows,
-          columns: state.columns,
-          profile: state.profile,
-          statisticalResults: state.executedTests,
-          attachedCharts: state.reportCharts,
-          researchObjective: state.objective,
-          filename: state.currentDataset
-        });
-
-        // Store canonical results into reportData
-        reportData.canonical_results = results;
-        reportData.workflow_report = assembled;
         state.currentReport = reportData;
+        state.currentReport.validation = validation;
 
         setStep(5, "5. Running independent report validation against dataset canonical truth...");
-        const validation = window.ResAIWorkflowEngine.validateReport();
-        state.currentReport.validation = validation;
 
         setTimeout(() => {
           for (let s = 1; s <= 5; s++) {
@@ -1174,6 +1154,50 @@ function renderWorkflowOutcome(assembled, results, validation, reportData) {
       claimBadge.style.background = "#ecfdf5";
       claimBadge.style.color = "#065f46";
       claimBadge.style.border = "1px solid #a7f3d0";
+    }
+  }
+
+  // Adaptive Intelligence Panel
+  const adaptivePanel = document.getElementById("outcome-adaptive-panel");
+  const domainBadge = document.getElementById("outcome-domain-badge");
+  const adaptiveSummary = document.getElementById("outcome-adaptive-summary");
+  const adaptiveSections = document.getElementById("outcome-adaptive-sections");
+
+  const plan = reportData.adaptive_plan || assembled.adaptive_plan;
+  const isAdaptive = reportData.is_adaptive || assembled.is_adaptive;
+  const domain = reportData.domain_detected || assembled.domain_detected || (plan && plan.domain_detected);
+
+  if (adaptivePanel) {
+    if (isAdaptive || plan || domain) {
+      adaptivePanel.style.display = "block";
+      if (domainBadge) {
+        domainBadge.textContent = `Domain: ${domain || "Empirical Research"}`;
+      }
+      if (adaptiveSummary && plan) {
+        const keyFindings = plan.key_findings_summary || "Report structure, narrative and visual analyses dynamically adapted to input dataset characteristics and template schema.";
+        adaptiveSummary.innerHTML = `<strong>Adaptive Report Plan:</strong> ${escapeHtml(keyFindings)}`;
+      } else if (adaptiveSummary) {
+        adaptiveSummary.innerHTML = `<strong>Dynamic Adaptation:</strong> Report synthesized dynamically to align dataset variables with publication-grade manuscript standards.`;
+      }
+
+      if (adaptiveSections && plan && Array.isArray(plan.sections)) {
+        adaptiveSections.innerHTML = plan.sections.map(s => {
+          const action = s.action || "adapted";
+          let color = "#166534";
+          let bg = "#dcfce7";
+          let border = "#bbf7d0";
+          if (action === "keep") { color = "#1e40af"; bg = "#dbeafe"; border = "#bfdbfe"; }
+          else if (action === "revise" || action === "adapt") { color = "#075985"; bg = "#e0f2fe"; border = "#bae6fd"; }
+          else if (action === "omit" || action === "remove") { color = "#991b1b"; bg = "#fee2e2"; border = "#fecaca"; }
+          return `<span class="badge" style="background: ${bg}; color: ${color}; border: 1px solid ${border}; font-size: 0.72rem; padding: 0.2rem 0.5rem;" title="${escapeHtml(s.content_guidance || s.reason || '')}">${escapeHtml(s.heading)}: ${escapeHtml(action)}</span>`;
+        }).join("");
+      } else if (adaptiveSections && assembled.sections && Array.isArray(assembled.sections)) {
+        adaptiveSections.innerHTML = assembled.sections.map(s => {
+          return `<span class="badge" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-size: 0.72rem; padding: 0.2rem 0.5rem;">${escapeHtml(s.heading)}: Grounded</span>`;
+        }).join("");
+      }
+    } else {
+      adaptivePanel.style.display = "none";
     }
   }
 

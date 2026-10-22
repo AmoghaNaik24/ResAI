@@ -327,11 +327,12 @@
         pText = pText.trim();
         if (!pText) return;
 
-        // Check if paragraph is styled as a heading
+        // Check if paragraph is styled as a heading or semantic outline
         const isStyleHeading = /<w:pStyle[^>]*w:val="([^"]*Heading[^"]*|[^"]*Title[^"]*)"/i.test(pXml);
-        const isSemanticHeading = /^(Abstract|Introduction|Methodology|Results|Discussion|Limitations|Conclusion|References|\d+\.\s+[A-Z])/i.test(pText);
+        const isBoldShort = (/<w:b\/>|<w:bCs\/>/i.test(pXml)) && pText.length < 80 && !pText.startsWith("[");
+        const isSemanticHeading = /^(Abstract|Overview|Title\s*Page|At\s+a\s+Glance|What\s+the\s+Data\s+Says|Segment\s+Comparison|Data\s+Confidence|Recommended\s+Next\s+Steps|Technical\s+Notes|Instructions\s+for\s+ResAI|Audience|Decision\s+Question|Introduction|Methodology|Methods|Results|Findings|Discussion|Limitations|Conclusion|References|\d+[\.\)]\s+[A-Z])/i.test(pText);
 
-        if (isStyleHeading || isSemanticHeading) {
+        if ((isStyleHeading || isSemanticHeading || isBoldShort) && !pText.startsWith("[")) {
           if (currentSection.paragraphs.length > 0 || currentSection.heading !== "Overview") {
             sections.push(currentSection);
           }
@@ -395,9 +396,12 @@
         });
       }
 
+      const rawDocTitle = sections[0] ? sections[0].heading : "Uploaded Academic Template";
+      const cleanDocTitle = rawDocTitle.replace(/\s+Template\b/i, "").trim() || "Research Insights Brief";
+
       return {
         template_id: "tpl_" + Date.now(),
-        document_title: sections[0] ? sections[0].heading : "Uploaded Academic Template",
+        document_title: cleanDocTitle,
         filename: fileName,
         format: "docx",
         is_builtin: false,
@@ -430,12 +434,16 @@
         const trimmed = line.trim();
         if (!trimmed) return;
 
-        if (trimmed.startsWith("#")) {
+        const isMarkdownHeading = trimmed.startsWith("#");
+        const isBoldHeading = /^\*\*[^*]+\*\*$/.test(trimmed) && trimmed.length < 80;
+        const isExplicitHeading = /^(Research Insights Brief|At a Glance|What the Data Says|Segment Comparison|Data Confidence and Caveats|Recommended Next Steps|Technical Notes|Instructions for ResAI|Audience|Decision Question|Abstract|Introduction|Methodology|Results|Discussion|Limitations|Conclusion|References)(:)?$/i.test(trimmed);
+
+        if ((isMarkdownHeading || isBoldHeading || isExplicitHeading) && !trimmed.startsWith("[")) {
           if (currentSection.paragraphs.length > 0 || currentSection.heading !== "Title") {
             sections.push(currentSection);
           }
-          const level = (trimmed.match(/^#+/) || ["#"])[0].length;
-          const headingText = trimmed.replace(/^#+\s*/, "");
+          const level = isMarkdownHeading ? (trimmed.match(/^#+/) || ["#"])[0].length : 2;
+          const headingText = trimmed.replace(/^#+\s*/, "").replace(/^\*\*|\*\*$/g, "").replace(/:$/, "").trim();
           currentSection = {
             section_id: `sec_${sections.length + 1}`,
             heading: headingText,
@@ -465,9 +473,12 @@
         warnings.push("No explicit tags found. Standard empirical placeholders assigned.");
       }
 
+      const rawTextTitle = sections[0] ? sections[0].heading : "Uploaded Research Outline";
+      const cleanTextTitle = rawTextTitle.replace(/\s+Template\b/i, "").trim() || "Research Insights Brief";
+
       return {
         template_id: "tpl_" + Date.now(),
-        document_title: sections[0] ? sections[0].heading : "Uploaded Research Outline",
+        document_title: cleanTextTitle,
         filename: fileName,
         format: "markdown",
         is_builtin: false,
@@ -596,18 +607,27 @@
       if (!heading || typeof heading !== "string") return "general_narrative";
       const h = heading.trim().toLowerCase();
 
-      if (/(abstract|executive\s+summary)/i.test(h)) return "abstract";
+      // Meta instructions & formatting rules to omit
+      if (/(instructions?\s*(for\s*\w+|to\s*\w+)?|guideline|formatting|how\s*to\s*use|style\s*rules|template\s*notes)/i.test(h)) return "formatting_guidance";
+      
+      // Metadata fields
+      if (/^audience\b/i.test(h)) return "audience_field";
+      if (/^(decision\s*question|research\s*question|inquiry\b)/i.test(h)) return "decision_question";
+
+      // Executive summaries & at-a-glance
+      if (/(abstract|executive\s+summary|at\s+a\s+glance|summary\s+at\s+a\s+glance|key\s+metrics|highlights)/i.test(h)) return "at_a_glance";
+      
       if (/title\s*page|front\s*matter|cover\s*page|^title$/i.test(h)) return "title_page";
       if (/(literature\s*review|related\s*work|scholarly\s*sources|theoretical\s*framework)/i.test(h)) return "literature_review";
-      if (/(cohort|subgroup|between[\s-]group|treatment|clinical|placebo)/i.test(h)) return "cohort_comparison";
-      if (/(results|findings|statistical\s*analysis|quantitative\s*findings|empirical\s*findings)/i.test(h)) return "analytical_results";
+      if (/(segment\s*comparison|cohort|subgroup|between[\s-]group|treatment|clinical|placebo)/i.test(h)) return "cohort_comparison";
+      if (/(what\s+the\s+data\s+says|results|findings|statistical\s*analysis|quantitative\s*findings|empirical\s*findings)/i.test(h)) return "analytical_results";
       if (/(introduction|background|problem\s*statement|context\b|scope\b)/i.test(h)) return "introduction";
-      if (/(methodology|methods\b|procedure|empirical\s*approach|materials|data\s*collection)/i.test(h)) return "methodology";
-      if (/(discussion|implications|interpretation|recommendations|strategic)/i.test(h)) return "discussion";
-      if (/(limitations|threats\s*to\s*validity)/i.test(h)) return "limitations";
+      if (/(technical\s*notes|methodology|methods\b|procedure|empirical\s*approach|materials|data\s*collection)/i.test(h)) return "technical_notes";
+      if (/(recommended\s*next\s*steps|recommendations|actionable\s*insights|next\s*steps)/i.test(h)) return "recommendations";
+      if (/(data\s*confidence|caveats|limitations|threats\s*to\s*validity)/i.test(h)) return "limitations";
+      if (/(discussion|implications|interpretation|strategic)/i.test(h)) return "discussion";
       if (/(conclusion|summary\s*of\s*findings|concluding\s*remarks)/i.test(h)) return "conclusion";
       if (/(references|works\s*cited|bibliography)/i.test(h)) return "references";
-      if (/guideline|formatting\s*(advice|notes|instructions|rules)|template\s*notes|how\s*to\s*use|style\s*rules/i.test(h)) return "formatting_guidance";
 
       return "general_narrative";
     }
@@ -617,14 +637,18 @@
       const trimmed = text.trim();
       if (!trimmed) return false;
 
-      // 1. Placeholder blanks (3 or more underscores, or bracketed author instructions)
-      if (/_{3,}/.test(trimmed)) return true;
-      if (/\[(insert|your|university|course|date|instructor|author|title|name|department|professor|affiliation)[^\]]*\]/i.test(trimmed)) return true;
+      // 1. Any bracketed instructional placeholder or bracketed text block
+      // e.g. [3–5 key metrics: ...], [Plain-language findings...], [Compare study_group...], [Generate or omit...], [State decision question...]
+      if (/^\s*\[.+\]\s*$/.test(trimmed)) return true;
+      if (/\[(3[–-]5\s+key\s+metrics|plain-language|compare\s+study_group|generate\s+or\s+omit|state\s+decision|insert|your|university|course|date|instructor|author|title|name|department|professor|affiliation|enter)[^\]]*\]/i.test(trimmed)) return true;
 
-      // 2. Template branding and attribution
+      // 2. Placeholder blanks (3 or more underscores, or bracketed author instructions)
+      if (/_{3,}/.test(trimmed)) return true;
+
+      // 3. Template branding and attribution
       if (/gentext\s*(group|\.ai)|generated\s+by\s+gentext|template\s+by\s+microsoft|template\s+created\s+by/i.test(trimmed)) return true;
 
-      // 3. Instructional imperative phrases and meta-instructions
+      // 4. Instructional imperative phrases and meta-instructions
       const instructionPatterns = [
         /^(write|provide|compose|summarize|begin|state|describe|explain|detail|discuss|present|replace|use|ensure|cite\s+at\s+least|include\s+at\s+least|note:|instructions:)\b/i,
         /\b(write a concise abstract|approximately 150 to 250 words|between 150 and 250 words)\b/i,
@@ -635,7 +659,8 @@
         /\b(begin the introduction by establishing the research problem)\b/i,
         /\b(example abstract sentence|example paragraph|for example, if you studied)\b/i,
         /\b(the purpose of this study was to examine\s+_{2,}|in a sample of\s+_{2,})\b/i,
-        /\b(enter author name here|author name,\s*institution)\b/i
+        /\b(enter author name here|author name,\s*institution)\b/i,
+        /\b(instructions\s+for\s+resai|treat\s+these\s+instructions\s+as\s+internal|generation\s+constraints)\b/i
       ];
 
       return instructionPatterns.some(pat => pat.test(trimmed));
@@ -682,6 +707,21 @@
             }
             break;
 
+          case "audience_field":
+            decision = "populate";
+            reason = "Specify verified audience context without reproducing placeholder brackets.";
+            evidenceSources = ["user_context"];
+            plannedOutputs = ["target_audience"];
+            break;
+
+          case "decision_question":
+            decision = "populate";
+            reason = "State empirical decision question or exploratory analysis objective without inventing unsupplied objectives.";
+            evidenceSources = ["user_context", "dataset_profile"];
+            plannedOutputs = ["decision_question_text"];
+            break;
+
+          case "at_a_glance":
           case "abstract":
             decision = "adapt";
             reason = "Synthesize an empirical executive summary from the research objective, actual methods, sample size, and verified results. Never copy template abstract instructions or blank underscores.";
@@ -722,6 +762,7 @@
             }
             break;
 
+          case "technical_notes":
           case "methodology":
             decision = "generate";
             reason = "Accurately document operations actually performed on the dataset (data cleaning, missingness handling, Bessel standard deviation, and test specifications).";
@@ -750,17 +791,17 @@
               (c.categories && c.categories.some(cat => /treatment|control|placebo/i.test(String(cat))))
             );
 
-            if (!hasGrouping || (isClinicalOrTreatment && !hasClinicalOrTreatmentVars)) {
+            if (isClinicalOrTreatment && !hasClinicalOrTreatmentVars) {
               decision = "omit";
-              reason = isClinicalOrTreatment && !hasClinicalOrTreatmentVars
-                ? "Section requires clinical or treatment-vs-control cohort data, which is absent from the input dataset profile. Eliminated to prevent ungrounded claims."
-                : "Section requires categorical grouping cohorts, but input dataset lacks a valid grouping factor. Eliminated to prevent ungrounded claims.";
+              reason = "Section requires clinical or treatment-vs-control cohort data, which is absent from the input dataset profile. Eliminated to prevent ungrounded claims.";
               status = "omitted";
               isRequired = false;
             } else {
               decision = "generate";
-              reason = "Synthesize empirical between-cohort statistical comparisons from verified data.";
-              evidenceSources = ["verified_results_json"];
+              reason = hasGrouping
+                ? "Synthesize empirical between-cohort statistical comparisons from verified data."
+                : "Provide explicit, honest methodological explanation of why segment comparison cannot be conducted (absence of suitable grouping factor), without copying template placeholder instructions.";
+              evidenceSources = ["verified_results_json", "dataset_profile"];
               plannedOutputs = ["between_cohort_inferences"];
             }
             break;
@@ -770,6 +811,13 @@
             reason = "Interpret findings strictly in relation to observed data boundaries and stated research objectives without speculative causal claims.";
             evidenceSources = ["verified_results_json", "user_context"];
             plannedOutputs = ["findings_interpretation", "contextual_implications"];
+            break;
+
+          case "recommendations":
+            decision = "generate";
+            reason = "Formulate practical, evidence-grounded methodological recommendations based on observed data boundaries.";
+            evidenceSources = ["dataset_profile", "verified_results_json"];
+            plannedOutputs = ["actionable_recommendations"];
             break;
 
           case "limitations":
@@ -883,22 +931,62 @@
       const varDesc = contColName ? contColName.replace(/_/g, " ") : "continuous outcome measures";
       const objective = u.research_objective || `evaluate empirical distributions of ${varDesc} across validated observations in ${datasetName}`;
 
+      // Domain-aware inference for adaptive narrative shaping
+      let domainContext = "General Quantitative Research";
+      let domainUnit = "";
+      const colNamesCombined = (prof && prof.columns ? prof.columns.map(c => c.name.toLowerCase()).join(" ") : "") + " " + datasetName.toLowerCase();
+
+      if (/placement|package|salary|lpa|ctc|campus|job|hired|company/i.test(colNamesCombined)) {
+        domainContext = "Campus Placement & Compensation Analysis";
+        domainUnit = " LPA";
+      } else if (/patient|clinical|trial|dosage|drug|treatment|recovery|survival|symptom|blood/i.test(colNamesCombined)) {
+        domainContext = "Clinical & Biomedical Science";
+        domainUnit = " units";
+      } else if (/student|gpa|exam|grade|score|course|academic|attendance|education/i.test(colNamesCombined)) {
+        domainContext = "Educational Performance Analytics";
+        domainUnit = " points";
+      } else if (/churn|customer|retention|ltv|revenue|sales|mrr|arr|subscription/i.test(colNamesCombined)) {
+        domainContext = "Customer & Commercial Analytics";
+        domainUnit = " $";
+      } else if (/sensor|temp|temperature|pressure|vibration|material|voltage|frequency/i.test(colNamesCombined)) {
+        domainContext = "Sensor Engineering & Materials Science";
+      }
+
       switch (sectionType) {
         case "title_page":
-          const title = u.document_title || `Quantitative Empirical Analysis of ${datasetName}`;
+          const title = u.document_title || `Empirical Analysis: ${domainContext} (${datasetName})`;
           const author = u.researcher_name || "Lead Lab Investigator";
           const inst = u.institution || "Department of Quantitative Research";
           const subDate = u.submission_date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
           return `**${title}**\n\n**Investigator:** ${author} | **Affiliation:** ${inst}\n\n**Date:** ${subDate} | **Session Identifier:** \`${this.sessionId}\``;
 
+        case "audience_field":
+          const aud = u.audience || u.target_audience || `${domainContext} Stakeholders and Analysts`;
+          return `**Target Audience:** ${aud}`;
+
+        case "decision_question":
+          const dq = u.decision_question || u.research_objective || `What are the verified empirical distributions, central tendencies, and key drivers of ${varDesc} within ${domainContext}?`;
+          return `**Decision Question / Core Inquiry:** ${dq}`;
+
+        case "at_a_glance":
+          let unitStr = domainUnit;
+          if (!unitStr && contColName && /package|salary|lpa/i.test(contColName)) {
+            unitStr = " LPA";
+          }
+          return `### Key Empirical Metrics at a Glance (${domainContext})\n\n` +
+            `* **Valid Record Count:** N = ${sampleSize} validated observations (${colCount} measured attributes).\n` +
+            `* **Primary Outcome Central Tendency:** Mean ${varDesc} = ${meanScore}${unitStr} (Sample SD = ${standardDeviation}${unitStr}).\n` +
+            `* **Data Completeness & Hygiene:** ${healthScore} Overall Health Index (${missingRate} missingness, ${dupRows} duplicate rows).\n` +
+            `* **Distribution Profile:** Empirical values for ${varDesc} demonstrate verified baseline dispersion across ${datasetName} without synthetic augmentation.`;
+
         case "abstract":
           let abstractInferential = hasHypothesisTest
             ? `Inferential hypothesis testing indicated ${resMap["inferential_significance_statement"].value} (${resMap["test_statistic"].formatted_value}, p = ${resMap["p_value"].formatted_value}, ${resMap["effect_size"].formatted_value}).`
             : "Hypothesis testing was not conducted due to the absence of a verified categorical grouping variable; analysis was constrained to descriptive parameter distributions.";
-          return `This quantitative investigation evaluated empirical metrics across N = ${sampleSize} validated observations from ${datasetName}. The primary research objective was to ${objective}. Univariate continuous evaluations yielded a sample mean of ${meanScore} (SD = ${standardDeviation}). ${abstractInferential} Results establish verified baseline distributions for subsequent reproducible investigation.`;
+          return `This quantitative investigation evaluated empirical metrics in the domain of ${domainContext} across N = ${sampleSize} validated observations from ${datasetName}. The primary research objective was to ${objective}. Univariate continuous evaluations yielded a sample mean of ${meanScore}${domainUnit} (SD = ${standardDeviation}${domainUnit}). ${abstractInferential} Results establish verified baseline distributions for subsequent reproducible decision-making.`;
 
         case "introduction":
-          return `Establishing verified empirical distributions is essential for reproducible quantitative science. This study examines data from ${datasetName}, comprising N = ${sampleSize} validated records across ${colCount} attributes. The central research inquiry focuses on: ${objective}. Analyses were restricted to deterministic computations derived directly from empirical data, with zero synthetic or unverified values introduced.`;
+          return `Establishing verified empirical distributions in ${domainContext} is essential for evidence-based decision-making. This study examines data from ${datasetName}, comprising N = ${sampleSize} validated records across ${colCount} attributes. The central research inquiry focuses on: ${objective}. Analyses were restricted to deterministic computations derived directly from empirical data, with zero synthetic or unverified values introduced.`;
 
         case "literature_review":
           if (u.literature_sources && u.literature_sources.length > 0) {
@@ -906,26 +994,63 @@
           }
           return `*Researcher Note: External literature review citations were not supplied by the author. In accordance with ResAI strict scientific integrity standards, the system does not fabricate fictitious papers, authors, or DOIs. Scholarly context should be populated with verified peer-reviewed sources.*`;
 
+        case "technical_notes":
         case "methodology":
           let testMethodText = hasHypothesisTest
             ? "Between-group comparisons were evaluated using Welch's robust two-sample t-test to protect against potential variance heterogeneity, alongside pooled Cohen's d effect size calculations."
             : "Inferential comparative hypothesis testing was formally blocked due to the absence of a two-group categorical grouping factor; analysis was constrained to univariate descriptive profiling.";
-          return `Data hygiene protocols were conducted on the dataset '${datasetName}' (${sampleSize} observations, ${colCount} attributes). Quality screening identified an overall health index of ${healthScore}, with an observed cell missingness rate of ${missingRate} and ${dupRows} duplicate records. Continuous variables were evaluated using sample standard deviations with Bessel's correction (N - 1 denominator). ${testMethodText} All calculations were performed deterministically without imputation or synthetic augmentation.`;
+          return `Data hygiene protocols were conducted on the dataset '${datasetName}' (${sampleSize} observations, ${colCount} attributes in ${domainContext}). Quality screening identified an overall health index of ${healthScore}, with an observed cell missingness rate of ${missingRate} and ${dupRows} duplicate records. Continuous variables were evaluated using sample standard deviations with Bessel's correction (N - 1 denominator). ${testMethodText} All calculations were performed deterministically without imputation or synthetic augmentation.`;
+
+        case "cohort_comparison":
+          if (hasHypothesisTest) {
+            return `Between-group comparisons were evaluated for ${varDesc}. The analysis revealed ${resMap["inferential_significance_statement"].formatted_value} (${resMap["test_statistic"].formatted_value}, p = ${resMap["p_value"].formatted_value}, ${resMap["effect_size"].formatted_value}).`;
+          } else {
+            return `A segment comparison between subgroups was not conducted because the uploaded dataset does not contain a suitable categorical grouping factor (e.g., 'study_group') with sufficient subgroup sample sizes. The analysis was conducted across the unified cohort (N = ${sampleSize}).`;
+          }
 
         case "analytical_results":
+          if (/what\s+the\s+data\s+says/i.test(heading)) {
+            return `Ranked Plain-Language Empirical Findings for ${datasetName} (${domainContext}, N = ${sampleSize}):\n\n` +
+              `1. **Central Tendency & Level:** The primary continuous outcome '${varDesc}' yielded an arithmetic sample mean of ${meanScore}${domainUnit} (Sample SD = ${standardDeviation}${domainUnit}).\n` +
+              `2. **Data Completeness:** Screening of valid records demonstrated an overall hygiene score of ${healthScore}, with ${missingRate} missingness observed across ${colCount} attributes.\n` +
+              `3. **Comparative Group Contrasts:** ${hasHypothesisTest ? `Between-group evaluation demonstrated ${resMap["inferential_significance_statement"].formatted_value} (${resMap["test_statistic"].formatted_value}, p = ${resMap["p_value"].formatted_value}).` : `Subgroup comparison was omitted due to the absence of a categorical factor; results represent unified cohort distributions.`}\n\n` +
+              `*Note: Findings are strictly observational and descriptive. In the absence of prospective randomized manipulation, results describe observed patterns rather than causal mechanisms.*`;
+          }
           let resultsInferentialText = hasHypothesisTest
             ? `Hypothesis testing was conducted to evaluate differences between experimental cohorts. As reported in Table 1, the analysis revealed ${resMap["inferential_significance_statement"].formatted_value} (${resMap["test_statistic"].formatted_value}, p = ${resMap["p_value"].formatted_value}, ${resMap["effect_size"].formatted_value}).`
             : "Hypothesis testing was not conducted due to the absence of a categorical grouping variable with two or more distinct levels. Numerical reporting was constrained to verified descriptive and distributional parameters.";
-          return `Comprehensive statistical summaries were computed for validated observations (N = ${sampleSize}). The primary continuous outcome measure (${varDesc}) yielded an arithmetic mean of ${meanScore} (SD = ${standardDeviation}). ${resultsInferentialText}\n\n### Table 1: Verified Quantitative Findings & Statistical Inferences\n| Metric / Measure | Verified Value | Statistical Procedure |\n| :--- | :--- | :--- |\n| Sample Size (N) | ${sampleSize} | Valid Record Count |\n| Arithmetic Mean (${varDesc}) | ${meanScore} | Sample Mean |\n| Sample Standard Deviation | ${standardDeviation} | Bessel's Correction (N-1) |\n| Data Health Score | ${healthScore} | Hygiene Index Algorithm |\n| Missingness Rate | ${missingRate} | Cell Missing Percentage |${hasHypothesisTest ? `\n| Test Statistic | ${resMap["test_statistic"].formatted_value} | ${resMap["test_statistic"].method} |\n| p-value | ${resMap["p_value"].formatted_value} | Two-Tailed t Distribution |\n| Effect Size | ${resMap["effect_size"].formatted_value} | Pooled Cohen's d |` : ''}`;
+          return `Comprehensive statistical summaries were computed for validated observations in ${domainContext} (N = ${sampleSize}). The primary continuous outcome measure (${varDesc}) yielded an arithmetic mean of ${meanScore}${domainUnit} (SD = ${standardDeviation}${domainUnit}). ${resultsInferentialText}\n\n### Table 1: Verified Quantitative Findings & Statistical Inferences\n| Metric / Measure | Verified Value | Statistical Procedure |\n| :--- | :--- | :--- |\n| Sample Size (N) | ${sampleSize} | Valid Record Count |\n| Arithmetic Mean (${varDesc}) | ${meanScore}${domainUnit} | Sample Mean |\n| Sample Standard Deviation | ${standardDeviation}${domainUnit} | Bessel's Correction (N-1) |\n| Data Health Score | ${healthScore} | Hygiene Index Algorithm |\n| Missingness Rate | ${missingRate} | Cell Missing Percentage |${hasHypothesisTest ? `\n| Test Statistic | ${resMap["test_statistic"].formatted_value} | ${resMap["test_statistic"].method} |\n| p-value | ${resMap["p_value"].formatted_value} | Two-Tailed t Distribution |\n| Effect Size | ${resMap["effect_size"].formatted_value} | Pooled Cohen's d |` : ''}`;
 
         case "discussion":
           let discInferential = hasHypothesisTest
             ? `The observed effect size (${resMap["effect_size"].formatted_value}) substantiates practical magnitude beyond mere sampling variance.`
             : "Because comparative grouping cohorts were not defined in the dataset, findings characterize baseline sample properties rather than differential treatment effects.";
-          return `The empirical findings provide quantitative characterization of the study observations in ${datasetName}. The observed sample mean of ${meanScore} (SD = ${standardDeviation}) reflects the central tendency of the validated records. ${discInferential} These outcomes align with the research objective (${objective}). Interpretations are disciplined by observed data boundaries, and causal claims are avoided in the absence of longitudinal randomized controls.`;
+          return `The empirical findings provide quantitative characterization of the study observations in ${datasetName} (${domainContext}). The observed sample mean of ${meanScore}${domainUnit} (SD = ${standardDeviation}${domainUnit}) reflects the central tendency of the validated records. ${discInferential} These outcomes align with the research objective (${objective}). Interpretations are disciplined by observed data boundaries, and causal claims are avoided in the absence of longitudinal randomized controls.`;
+
+        case "recommendations":
+          if (domainContext.includes("Placement")) {
+            return `Domain-Grounded Recommendations for ${datasetName} (Campus Placement & Salary Context, N = ${sampleSize}):\n\n` +
+              `1. **Focus on Placement Drivers:** Correlate academic and technical test performance with package compensation (${meanScore} LPA average) to guide student training.\n` +
+              `2. **Lower-Tier Package Elevation:** Target specialized mentorship to cohorts in the lower distribution quartiles to elevate overall placement benchmarks.\n` +
+              `3. **Recruiter Alignment:** Expand outreach to industry recruiters aligned with the verified skillset profile of the student body.`;
+          } else if (domainContext.includes("Clinical")) {
+            return `Domain-Grounded Recommendations for ${datasetName} (Clinical Context, N = ${sampleSize}):\n\n` +
+              `1. **Stratified Subgroup Monitoring:** Track outcomes across high-risk demographic and baseline symptom categories.\n` +
+              `2. **Dosage & Exposure Tracking:** Monitor quantitative biomarker response against safety boundaries.\n` +
+              `3. **Longitudinal Follow-up:** Extend multi-point tracking to assess durability of therapeutic response.`;
+          } else if (domainContext.includes("Customer")) {
+            return `Domain-Grounded Recommendations for ${datasetName} (Customer Analytics Context, N = ${sampleSize}):\n\n` +
+              `1. **Early Retention Interventions:** Trigger automated outreach when engagement scores fall below empirical median thresholds.\n` +
+              `2. **High-Value Protection:** Prioritize dedicated account management for upper-quartile revenue contributors.\n` +
+              `3. **Onboarding Friction Removal:** Optimize initial touchpoints to accelerate user time-to-value.`;
+          }
+          return `Based on empirical boundaries observed in ${datasetName} (${domainContext}, N = ${sampleSize}):\n\n` +
+            `1. **Subgroup Data Collection:** If comparative contrast testing is desired, prospective data collection should incorporate explicit categorical grouping labels (e.g., cohort or condition assignment) with balanced sample sizes.\n` +
+            `2. **Sample Expansion:** Increasing observation density beyond N = ${sampleSize} will narrow confidence intervals and enhance generalizability.\n` +
+            `3. **Temporal Tracking:** Incorporating longitudinal timestamps will allow assessment of time-series trends and seasonal patterns.`;
 
         case "limitations":
-          return `Several empirical boundaries contextualize the reported results. First, the analysis is based on an observed sample of N = ${sampleSize} records in ${datasetName}. Second, data quality screening recorded a missingness rate of ${missingRate}. Third, in the absence of randomized manipulation or prospective tracking, findings characterize observed associations rather than causal mechanisms.`;
+          return `Several empirical boundaries contextualize the reported results. First, the analysis is based on an observed sample of N = ${sampleSize} records in ${datasetName}. Second, data quality screening recorded a missingness rate of ${missingRate}. Third, in the absence of randomized manipulation or prospective tracking, findings characterize observed associations rather than causal mechanisms. Only empirically verified limitations are reported without unsupported claims regarding synthetic data or external representativeness.`;
 
         case "conclusion":
           return `In conclusion, deterministic analysis of ${datasetName} confirms verified baseline metrics for N = ${sampleSize} observations. Verified parameters—including Mean = ${meanScore} and SD = ${standardDeviation}—provide an auditable foundation for future empirical inquiry and replication.`;
@@ -1642,7 +1767,9 @@
       });
 
       // Construct Markdown representation
-      let markdown = `# ${this.templateDecisionsJSON.document_title || tpl.document_title}\n\n`;
+      const rawTitle = this.templateDecisionsJSON.document_title || tpl.document_title || "Research Insights Brief";
+      const cleanTitle = rawTitle.replace(/\s+Template\b/i, "").trim() || "Research Insights Brief";
+      let markdown = `# ${cleanTitle}\n\n`;
       const researcherName = (this.userContext && this.userContext.researcher_name) || "Lead Lab Investigator";
       markdown += `**Principal Investigator:** ${researcherName} | **Session:** \`${this.sessionId}\` | **Date:** ${new Date().toLocaleDateString()}\n\n---\n\n`;
 
@@ -1689,7 +1816,7 @@
             }
           } else {
             // Generate genuine OpenXML DOCX package for built-in template
-            const zip = this._buildBuiltinDocxPackage(jszipObj, assembledSections, resMap, this.templateDecisionsJSON.document_title || tpl.document_title);
+            const zip = this._buildBuiltinDocxPackage(jszipObj, assembledSections, resMap, cleanTitle);
             if (typeof Blob !== 'undefined') {
               docxBlob = await zip.generateAsync({
                 type: "blob",
@@ -1708,7 +1835,7 @@
       this.assembledReport = {
         report_id: "rep_" + Date.now(),
         session_id: this.sessionId,
-        title: this.templateDecisionsJSON.document_title || tpl.document_title,
+        title: cleanTitle,
         template_id: tpl.template_id,
         is_builtin: tpl.is_builtin,
         date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
@@ -1744,16 +1871,18 @@
 
         // 1. Detect if this paragraph is a Section Heading
         const isStyleHeading = /<w:pStyle[^>]*w:val="([^"]*Heading[^"]*|[^"]*Title[^"]*)"/i.test(paraXml);
-        const isSemanticHeading = /^(Abstract|Overview|Title\s*Page|1\.\s+Introduction|2\.\s+Methodology|2\.\s+Literature\s+Review|3\.\s+Methodology|3\.\s+Results|4\.\s+Results|4\.\s+Discussion|5\.\s+Discussion|5\.\s+Limitations|6\.\s+Limitations|6\.\s+Conclusion|7\.\s+Conclusion|7\.\s+References|References|Formatting\s+Guidelines|\d+\.\s+[A-Z])/i.test(trimmed);
+        const isBoldShort = (/<w:b\/>|<w:bCs\/>/i.test(paraXml)) && trimmed.length < 80 && !trimmed.startsWith("[");
+        const isSemanticHeading = /^(Abstract|Overview|Title\s*Page|At\s+a\s+Glance|What\s+the\s+Data\s+Says|Segment\s+Comparison|Data\s+Confidence|Recommended\s+Next\s+Steps|Technical\s+Notes|Instructions\s+for\s+ResAI|Audience|Decision\s+Question|1\.\s+Introduction|2\.\s+Methodology|2\.\s+Literature\s+Review|3\.\s+Methodology|3\.\s+Results|4\.\s+Results|4\.\s+Discussion|5\.\s+Discussion|5\.\s+Limitations|6\.\s+Limitations|6\.\s+Conclusion|7\.\s+Conclusion|7\.\s+References|References|Formatting\s+Guidelines|\d+[\.\)]\s+[A-Z])/i.test(trimmed);
 
-        if (isStyleHeading || isSemanticHeading) {
-          currentSectionHeading = trimmed;
+        if ((isStyleHeading || isSemanticHeading || isBoldShort) && !trimmed.startsWith("[")) {
+          currentSectionHeading = trimmed.replace(/\s+Template\b/i, "");
           const secType = this.classifySectionType(trimmed);
 
           let secDec = null;
           if (decisions && decisions.sections) {
             secDec = decisions.sections.find(s => 
               s.original_heading.toLowerCase() === trimmed.toLowerCase() ||
+              s.original_heading.toLowerCase() === currentSectionHeading.toLowerCase() ||
               s.section_type === secType
             );
           }
@@ -1761,9 +1890,15 @@
           currentSectionId = secDec ? secDec.section_id : `sec_${secType}`;
           currentSectionDecision = secDec ? secDec.decision : (secType === "formatting_guidance" ? "omit" : "adapt");
 
-          // If this section is to be omitted (e.g. Formatting Guidelines), remove the heading
+          // If this section is to be omitted (e.g. Formatting Guidelines or Instructions for ResAI), remove the heading
           if (currentSectionDecision === "omit" || secType === "formatting_guidance") {
             return "";
+          }
+
+          // If heading contains Template suffix, strip it in text run
+          if (/\bTemplate\b/i.test(trimmed)) {
+            const cleanedH = trimmed.replace(/\s+Template\b/i, "");
+            return paraXml.replace(tRegex, (tTag, open, text, close) => `${open}${cleanedH}${close}`);
           }
 
           // Otherwise keep the authentic heading with original formatting
@@ -1780,9 +1915,16 @@
           return "";
         }
 
-        // 4. Handle instructional paragraphs or blank placeholders
+        // 4. Handle audience or decision question metadata fields
         let updatedText = combinedText;
-        if (this.isInstructionOrExampleParagraph(trimmed)) {
+        if (/^audience\s*:\s*\[/i.test(trimmed)) {
+          const aud = (this.userContext && (this.userContext.audience || this.userContext.target_audience)) || "General Research & Analytical Stakeholders";
+          updatedText = `Target Audience: ${aud}`;
+        } else if (/^(decision\s*question|primary\s*inquiry)\s*:\s*\[/i.test(trimmed)) {
+          const dq = (this.userContext && (this.userContext.decision_question || this.userContext.research_objective)) || "Exploratory empirical baseline evaluation (no specific decision question was supplied by the researcher).";
+          updatedText = `Primary Decision / Research Inquiry: ${dq}`;
+        } else if (this.isInstructionOrExampleParagraph(trimmed)) {
+          // 5. Handle instructional paragraphs or blank placeholders
           if (["adapt", "generate", "populate", "ask_user"].includes(currentSectionDecision)) {
             const repl = sectionReplacementMap[currentSectionId] || 
                          sectionReplacementMap[currentSectionHeading.toLowerCase()] ||
@@ -2017,15 +2159,27 @@
           blankUnderscoresFound = true;
           blockingIssues.push(`Unfilled underscore placeholder blanks detected: "${p.substring(0, 70)}..."`);
         }
-        if (/\[(insert|your|university|course)[^\]]*\]/i.test(p)) {
+        if (/\[(?:3[–-]5|plain-language|compare\s+study_group|generate\s+or\s+omit|state\s+decision|insert|your|university|course|author|enter|describe|explain)[^\]]*\]/i.test(p) || /^\s*\[.+\]\s*$/.test(p)) {
           bracketPlaceholdersFound = true;
-          blockingIssues.push(`Unfilled bracketed metadata placeholder detected: "${p.substring(0, 70)}..."`);
+          blockingIssues.push(`Unfilled bracketed instructional placeholder detected: "${p.substring(0, 70)}..."`);
         }
         if (/gentext\s*(group|\.ai)|generated\s+by\s+gentext/i.test(p)) {
           brandingFound = true;
           blockingIssues.push(`Third-party template branding detected in narrative.`);
         }
       });
+
+      // Assert that required sections are not empty
+      (this.assembledReport.sections || []).forEach(sec => {
+        const text = (sec.paragraphs || []).join(" ").trim();
+        if (!text) {
+          blockingIssues.push(`Section '${sec.heading}' is empty in assembled report.`);
+        }
+      });
+
+      if (/\bTemplate\b/i.test(this.assembledReport.title || "")) {
+        warnings.push("Document title contains redundant 'Template' suffix.");
+      }
 
       checks.push({
         check_id: "chk_instruction_removal",
